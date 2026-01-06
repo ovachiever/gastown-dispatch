@@ -8,7 +8,7 @@ export default function SettingsPage() {
 	const queryClient = useQueryClient();
 	const [townRoot, setTownRoot] = useState("");
 
-	const { data: status } = useQuery({
+	const { data: response } = useQuery({
 		queryKey: ["status"],
 		queryFn: getStatus,
 	});
@@ -19,6 +19,8 @@ export default function SettingsPage() {
 			queryClient.invalidateQueries({ queryKey: ["status"] });
 		},
 	});
+
+	const status = response?.initialized ? response.status : undefined;
 
 	return (
 		<div className="p-6 max-w-2xl">

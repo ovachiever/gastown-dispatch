@@ -1,5 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Play, Square, Activity, Truck, CircleDot, Users } from "lucide-react";
+import {
+	RefreshCw,
+	Play,
+	Square,
+	Activity,
+	Truck,
+	CircleDot,
+	Users,
+	AlertTriangle,
+} from "lucide-react";
 import { getStatus, startTown, shutdownTown } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -106,7 +115,7 @@ function RigCard({
 
 export default function Overview() {
   const {
-    data: status,
+    data: response,
     isLoading,
     error,
     refetch,
@@ -153,8 +162,32 @@ export default function Overview() {
     );
   }
 
+  // Handle uninitialized state
+  if (!response?.initialized) {
+    return (
+      <div className="p-6">
+        <div className="bg-amber-900/20 border border-amber-500 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertTriangle className="text-amber-400" size={24} />
+            <h2 className="text-lg font-medium text-amber-300">
+              Gas Town Not Configured
+            </h2>
+          </div>
+          <p className="text-amber-200/80 mb-4">
+            {response?.error ||
+              "Not connected to a Gas Town workspace."}
+          </p>
+          <p className="text-sm text-gt-muted">
+            Set the <code className="bg-gt-surface px-1 rounded">GT_TOWN_ROOT</code> environment variable or start the server from within a Gas Town project directory.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const status = response.status;
   const deaconRunning = status?.agents.some(
-    (a) => a.role === "deacon" && a.running
+    (a) => a.role === "deacon" && a.running,
   );
 
   return (

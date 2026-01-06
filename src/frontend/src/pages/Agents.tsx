@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Users, Terminal, MessageSquare } from "lucide-react";
+import { RefreshCw, Users, Terminal, MessageSquare, AlertTriangle } from "lucide-react";
 import { getStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { AgentRuntime, RigStatus } from "@/types/api";
 
 export default function Agents() {
 	const {
-		data: status,
+		data: response,
 		isLoading,
 		error,
 		refetch,
@@ -40,13 +41,34 @@ export default function Agents() {
 		);
 	}
 
+	// Handle uninitialized state
+	if (!response?.initialized || !response.status) {
+		return (
+			<div className="p-6">
+				<div className="bg-amber-900/20 border border-amber-500 rounded-lg p-6">
+					<div className="flex items-center gap-3 mb-3">
+						<AlertTriangle className="text-amber-400" size={24} />
+						<h2 className="text-lg font-medium text-amber-300">
+							Gas Town Not Configured
+						</h2>
+					</div>
+					<p className="text-amber-200/80">
+						{response?.error || "Not connected to a Gas Town workspace."}
+					</p>
+				</div>
+			</div>
+		);
+	}
+
+	const status = response.status;
+
 	// Collect all agents from global + rig-level
-	const allAgents = [
-		...(status?.agents || []),
-		...(status?.rigs?.flatMap((rig) => rig.agents || []) || []),
+	const allAgents: AgentRuntime[] = [
+		...(status.agents || []),
+		...(status.rigs?.flatMap((rig: RigStatus) => rig.agents || []) || []),
 	];
 
-	const globalAgents = status?.agents || [];
+	const globalAgents = status.agents || [];
 
 	// rigAgents used for future features
 	void allAgents;
