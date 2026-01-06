@@ -1,5 +1,7 @@
-import { spawn, ChildProcess } from "child_process";
+import { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "fs";
+import { join } from "path";
 import { findTownRoot } from "../config/townRoot.js";
 import { dispatchStreamer } from "./streaming.js";
 
@@ -18,8 +20,21 @@ export interface DispatchMessage {
 export interface DispatchSession {
   id: string;
   started: string;
+  ended?: string;
   messages: DispatchMessage[];
   status: "active" | "idle" | "error";
+}
+
+// Get transcripts directory
+function getTranscriptsDir(): string {
+  const dataDir = process.env.DISPATCH_DATA_DIR || join(process.cwd(), ".dispatch");
+  const transcriptsDir = join(dataDir, "transcripts");
+  
+  if (!existsSync(transcriptsDir)) {
+    mkdirSync(transcriptsDir, { recursive: true });
+  }
+  
+  return transcriptsDir;
 }
 
 class DispatchService extends EventEmitter {
@@ -28,6 +43,11 @@ class DispatchService extends EventEmitter {
   private messageIdCounter = 0;
 
   async startSession(townRoot?: string): Promise<DispatchSession> {
+    // Save previous session before starting new one
+    if (this.currentSession && this.currentSession.messages.length > 0) {
+      this.saveTranscript(this.currentSession);
+    }
+
     if (this.currentSession?.status === "active") {
       return this.currentSession;
     }
@@ -60,6 +80,9 @@ class DispatchService extends EventEmitter {
       content,
     });
 
+    // Broadcast user message to all clients
+    dispatchStreamer.sendToAll("message", userMsg);
+
     // Send to Mayor via gt nudge
     const cwd = townRoot || findTownRoot() || process.cwd();
     
@@ -79,6 +102,9 @@ class DispatchService extends EventEmitter {
 
       // Broadcast to all connected clients
       dispatchStreamer.sendToAll("message", responseMsg);
+
+      // Auto-save after each exchange
+      this.autoSave();
 
       return responseMsg;
     } catch (err) {
@@ -108,6 +134,24 @@ class DispatchService extends EventEmitter {
     return message;
   }
 
+  private autoSave(): void {
+    if (this.currentSession && this.currentSession.messages.length > 0) {
+      this.saveTranscript(this.currentSession);
+    }
+  }
+
+  private saveTranscript(session: DispatchSession): void {
+    try {
+      const transcriptsDir = getTranscriptsDir();
+      const filename = `${session.id}.json`;
+      const filepath = join(transcriptsDir, filename);
+      
+      writeFileSync(filepath, JSON.stringify(session, null, 2));
+    } catch (err) {
+      console.error("Failed to save transcript:", err);
+    }
+  }
+
   getSession(): DispatchSession | null {
     return this.currentSession;
   }
@@ -116,13 +160,55 @@ class DispatchService extends EventEmitter {
     return this.currentSession?.messages || [];
   }
 
+  // Get list of saved transcripts
+  getTranscripts(): { id: string; started: string; messageCount: number }[] {
+    try {
+      const transcriptsDir = getTranscriptsDir();
+      const files = readdirSync(transcriptsDir).filter(f => f.endsWith(".json"));
+      
+      return files.map(file => {
+        const filepath = join(transcriptsDir, file);
+        const content = readFileSync(filepath, "utf-8");
+        const session = JSON.parse(content) as DispatchSession;
+        return {
+          id: session.id,
+          started: session.started,
+          messageCount: session.messages.length,
+        };
+      }).sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
+    } catch {
+      return [];
+    }
+  }
+
+  // Load a specific transcript
+  loadTranscript(sessionId: string): DispatchSession | null {
+    try {
+      const transcriptsDir = getTranscriptsDir();
+      const filepath = join(transcriptsDir, `${sessionId}.json`);
+      
+      if (!existsSync(filepath)) {
+        return null;
+      }
+      
+      const content = readFileSync(filepath, "utf-8");
+      return JSON.parse(content) as DispatchSession;
+    } catch {
+      return null;
+    }
+  }
+
   endSession(): void {
     if (this.currentSession) {
+      this.currentSession.ended = new Date().toISOString();
       this.addMessage({
         role: "system",
         content: "Dispatch session ended.",
       });
       this.currentSession.status = "idle";
+      
+      // Save final transcript
+      this.saveTranscript(this.currentSession);
     }
     
     if (this.process) {
