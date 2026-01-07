@@ -1,221 +1,279 @@
-import { ChildProcess } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { EventEmitter } from "events";
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "fs";
+import {
+	existsSync,
+	mkdirSync,
+	writeFileSync,
+	readFileSync,
+	readdirSync,
+} from "fs";
 import { join } from "path";
 import { findTownRoot } from "../config/townRoot.js";
 import { dispatchStreamer } from "./streaming.js";
 
 export interface DispatchMessage {
-  id: string;
-  role: "user" | "mayor" | "system";
-  content: string;
-  timestamp: string;
-  metadata?: {
-    agent?: string;
-    action?: string;
-    beadId?: string;
-  };
+	id: string;
+	role: "user" | "mayor" | "system";
+	content: string;
+	timestamp: string;
+	metadata?: {
+		agent?: string;
+		action?: string;
+		beadId?: string;
+	};
 }
 
 export interface DispatchSession {
-  id: string;
-  started: string;
-  ended?: string;
-  messages: DispatchMessage[];
-  status: "active" | "idle" | "error";
+	id: string;
+	started: string;
+	ended?: string;
+	messages: DispatchMessage[];
+	status: "active" | "idle" | "error";
 }
 
 // Get transcripts directory
 function getTranscriptsDir(): string {
-  const dataDir = process.env.DISPATCH_DATA_DIR || join(process.cwd(), ".dispatch");
-  const transcriptsDir = join(dataDir, "transcripts");
-  
-  if (!existsSync(transcriptsDir)) {
-    mkdirSync(transcriptsDir, { recursive: true });
-  }
-  
-  return transcriptsDir;
+	const dataDir =
+		process.env.DISPATCH_DATA_DIR || join(process.cwd(), ".dispatch");
+	const transcriptsDir = join(dataDir, "transcripts");
+
+	if (!existsSync(transcriptsDir)) {
+		mkdirSync(transcriptsDir, { recursive: true });
+	}
+
+	return transcriptsDir;
 }
 
 class DispatchService extends EventEmitter {
-  private process: ChildProcess | null = null;
-  private currentSession: DispatchSession | null = null;
-  private messageIdCounter = 0;
+	private process: ChildProcess | null = null;
+	private currentSession: DispatchSession | null = null;
+	private messageIdCounter = 0;
 
-  async startSession(townRoot?: string): Promise<DispatchSession> {
-    // Save previous session before starting new one
-    if (this.currentSession && this.currentSession.messages.length > 0) {
-      this.saveTranscript(this.currentSession);
-    }
+	async startSession(townRoot?: string): Promise<DispatchSession> {
+		// Save previous session before starting new one
+		if (this.currentSession && this.currentSession.messages.length > 0) {
+			this.saveTranscript(this.currentSession);
+		}
 
-    if (this.currentSession?.status === "active") {
-      return this.currentSession;
-    }
+		if (this.currentSession?.status === "active") {
+			return this.currentSession;
+		}
 
-    const sessionId = `dispatch-${Date.now()}`;
-    this.currentSession = {
-      id: sessionId,
-      started: new Date().toISOString(),
-      messages: [],
-      status: "active",
-    };
+		const sessionId = `dispatch-${Date.now()}`;
+		this.currentSession = {
+			id: sessionId,
+			started: new Date().toISOString(),
+			messages: [],
+			status: "active",
+		};
 
-    // Add system message
-    this.addMessage({
-      role: "system",
-      content: "Dispatch session started. You can now communicate with the Mayor.",
-    });
+		// Reset streamer state for new session
+		dispatchStreamer.resetState();
 
-    return this.currentSession;
-  }
+		// Add system message
+		this.addMessage({
+			role: "system",
+			content:
+				"Dispatch session started. You can now communicate with the Mayor.",
+		});
 
-  async sendMessage(content: string, townRoot?: string): Promise<DispatchMessage> {
-    if (!this.currentSession) {
-      await this.startSession(townRoot);
-    }
+		return this.currentSession;
+	}
 
-    // Add user message
-    const userMsg = this.addMessage({
-      role: "user",
-      content,
-    });
+	async sendMessage(
+		content: string,
+		townRoot?: string,
+	): Promise<DispatchMessage> {
+		if (!this.currentSession) {
+			await this.startSession(townRoot);
+		}
 
-    // Broadcast user message to all clients
-    dispatchStreamer.sendToAll("message", userMsg);
+		// Add user message (don't broadcast - frontend already shows it optimistically)
+		const userMsg = this.addMessage({
+			role: "user",
+			content,
+		});
 
-    // Send to Mayor via gt nudge
-    const cwd = townRoot || findTownRoot() || process.cwd();
-    
-    try {
-      // For now, we'll simulate the Mayor response
-      // In production, this would use gt nudge mayor "message"
-      // and listen for the response via the mail system
-      
-      const responseMsg = this.addMessage({
-        role: "mayor",
-        content: `Acknowledged: "${content}". The Mayor will process this request.`,
-        metadata: {
-          agent: "mayor",
-          action: "acknowledge",
-        },
-      });
+		// Send to Mayor via gt nudge
+		const cwd = townRoot || findTownRoot() || process.cwd();
 
-      // Broadcast to all connected clients
-      dispatchStreamer.sendToAll("message", responseMsg);
+		try {
+			// Use gt nudge to send message to Mayor's Claude session
+			const nudgeResult = await this.nudgeMayor(content, cwd);
 
-      // Auto-save after each exchange
-      this.autoSave();
+			if (!nudgeResult.success) {
+				// Only send error message if nudge failed
+				const errorMsg = this.addMessage({
+					role: "system",
+					content: `Failed to reach Mayor: ${nudgeResult.error}`,
+				});
+				dispatchStreamer.sendToAll("message", errorMsg);
+			}
+			// If successful, Mayor's response will come through tmux capture streaming
 
-      return responseMsg;
-    } catch (err) {
-      const errorMsg = this.addMessage({
-        role: "system",
-        content: `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
-      });
-      dispatchStreamer.sendToAll("error", errorMsg);
-      throw err;
-    }
-  }
+			// Auto-save after each exchange
+			this.autoSave();
 
-  private addMessage(
-    partial: Omit<DispatchMessage, "id" | "timestamp">
-  ): DispatchMessage {
-    const message: DispatchMessage = {
-      id: `msg-${++this.messageIdCounter}`,
-      timestamp: new Date().toISOString(),
-      ...partial,
-    };
+			return userMsg;
+		} catch (err) {
+			const errorMsg = this.addMessage({
+				role: "system",
+				content: `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
+			});
+			dispatchStreamer.sendToAll("error", errorMsg);
+			throw err;
+		}
+	}
 
-    if (this.currentSession) {
-      this.currentSession.messages.push(message);
-    }
+	private nudgeMayor(
+		message: string,
+		cwd: string,
+	): Promise<{ success: boolean; error?: string }> {
+		return new Promise((resolve) => {
+			const proc = spawn("gt", ["nudge", "mayor", message], {
+				cwd,
+				stdio: ["ignore", "pipe", "pipe"],
+			});
 
-    this.emit("message", message);
-    return message;
-  }
+			let stdout = "";
+			let stderr = "";
 
-  private autoSave(): void {
-    if (this.currentSession && this.currentSession.messages.length > 0) {
-      this.saveTranscript(this.currentSession);
-    }
-  }
+			proc.stdout.on("data", (data) => {
+				stdout += data.toString();
+			});
+			proc.stderr.on("data", (data) => {
+				stderr += data.toString();
+			});
 
-  private saveTranscript(session: DispatchSession): void {
-    try {
-      const transcriptsDir = getTranscriptsDir();
-      const filename = `${session.id}.json`;
-      const filepath = join(transcriptsDir, filename);
-      
-      writeFileSync(filepath, JSON.stringify(session, null, 2));
-    } catch (err) {
-      console.error("Failed to save transcript:", err);
-    }
-  }
+			proc.on("close", (code) => {
+				if (code === 0) {
+					resolve({ success: true });
+				} else {
+					resolve({
+						success: false,
+						error: stderr || stdout || `Exit code ${code}`,
+					});
+				}
+			});
 
-  getSession(): DispatchSession | null {
-    return this.currentSession;
-  }
+			proc.on("error", (err) => {
+				resolve({ success: false, error: err.message });
+			});
 
-  getMessages(): DispatchMessage[] {
-    return this.currentSession?.messages || [];
-  }
+			// Timeout after 10 seconds
+			setTimeout(() => {
+				proc.kill();
+				resolve({ success: false, error: "Timeout waiting for gt nudge" });
+			}, 10000);
+		});
+	}
 
-  // Get list of saved transcripts
-  getTranscripts(): { id: string; started: string; messageCount: number }[] {
-    try {
-      const transcriptsDir = getTranscriptsDir();
-      const files = readdirSync(transcriptsDir).filter(f => f.endsWith(".json"));
-      
-      return files.map(file => {
-        const filepath = join(transcriptsDir, file);
-        const content = readFileSync(filepath, "utf-8");
-        const session = JSON.parse(content) as DispatchSession;
-        return {
-          id: session.id,
-          started: session.started,
-          messageCount: session.messages.length,
-        };
-      }).sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
-    } catch {
-      return [];
-    }
-  }
+	private addMessage(
+		partial: Omit<DispatchMessage, "id" | "timestamp">,
+	): DispatchMessage {
+		const message: DispatchMessage = {
+			id: `msg-${++this.messageIdCounter}`,
+			timestamp: new Date().toISOString(),
+			...partial,
+		};
 
-  // Load a specific transcript
-  loadTranscript(sessionId: string): DispatchSession | null {
-    try {
-      const transcriptsDir = getTranscriptsDir();
-      const filepath = join(transcriptsDir, `${sessionId}.json`);
-      
-      if (!existsSync(filepath)) {
-        return null;
-      }
-      
-      const content = readFileSync(filepath, "utf-8");
-      return JSON.parse(content) as DispatchSession;
-    } catch {
-      return null;
-    }
-  }
+		if (this.currentSession) {
+			this.currentSession.messages.push(message);
+		}
 
-  endSession(): void {
-    if (this.currentSession) {
-      this.currentSession.ended = new Date().toISOString();
-      this.addMessage({
-        role: "system",
-        content: "Dispatch session ended.",
-      });
-      this.currentSession.status = "idle";
-      
-      // Save final transcript
-      this.saveTranscript(this.currentSession);
-    }
-    
-    if (this.process) {
-      this.process.kill();
-      this.process = null;
-    }
-  }
+		this.emit("message", message);
+		return message;
+	}
+
+	private autoSave(): void {
+		if (this.currentSession && this.currentSession.messages.length > 0) {
+			this.saveTranscript(this.currentSession);
+		}
+	}
+
+	private saveTranscript(session: DispatchSession): void {
+		try {
+			const transcriptsDir = getTranscriptsDir();
+			const filename = `${session.id}.json`;
+			const filepath = join(transcriptsDir, filename);
+
+			writeFileSync(filepath, JSON.stringify(session, null, 2));
+		} catch (err) {
+			console.error("Failed to save transcript:", err);
+		}
+	}
+
+	getSession(): DispatchSession | null {
+		return this.currentSession;
+	}
+
+	getMessages(): DispatchMessage[] {
+		return this.currentSession?.messages || [];
+	}
+
+	// Get list of saved transcripts
+	getTranscripts(): { id: string; started: string; messageCount: number }[] {
+		try {
+			const transcriptsDir = getTranscriptsDir();
+			const files = readdirSync(transcriptsDir).filter((f) =>
+				f.endsWith(".json"),
+			);
+
+			return files
+				.map((file) => {
+					const filepath = join(transcriptsDir, file);
+					const content = readFileSync(filepath, "utf-8");
+					const session = JSON.parse(content) as DispatchSession;
+					return {
+						id: session.id,
+						started: session.started,
+						messageCount: session.messages.length,
+					};
+				})
+				.sort(
+					(a, b) =>
+						new Date(b.started).getTime() - new Date(a.started).getTime(),
+				);
+		} catch {
+			return [];
+		}
+	}
+
+	// Load a specific transcript
+	loadTranscript(sessionId: string): DispatchSession | null {
+		try {
+			const transcriptsDir = getTranscriptsDir();
+			const filepath = join(transcriptsDir, `${sessionId}.json`);
+
+			if (!existsSync(filepath)) {
+				return null;
+			}
+
+			const content = readFileSync(filepath, "utf-8");
+			return JSON.parse(content) as DispatchSession;
+		} catch {
+			return null;
+		}
+	}
+
+	endSession(): void {
+		if (this.currentSession) {
+			this.currentSession.ended = new Date().toISOString();
+			this.addMessage({
+				role: "system",
+				content: "Dispatch session ended.",
+			});
+			this.currentSession.status = "idle";
+
+			// Save final transcript
+			this.saveTranscript(this.currentSession);
+		}
+
+		if (this.process) {
+			this.process.kill();
+			this.process = null;
+		}
+	}
 }
 
 export const dispatchService = new DispatchService();
