@@ -26,8 +26,8 @@ export function Terminal({
 
 		// Initialize xterm.js with Gas Town aesthetic
 		const term = new XTerm({
-			cursorBlink: true,
-			cursorStyle: "block",
+			cursorBlink: false,
+			cursorStyle: "bar",
 			cursorInactiveStyle: "none",
 			fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace",
 			fontSize: 13,
@@ -37,7 +37,7 @@ export function Terminal({
 			theme: {
 				background: "#0a0a0f", // Deep dark - the void
 				foreground: "#e4e4e7", // Soft white
-				cursor: "#facc15", // Gas Town gold
+				cursor: "#0a0a0f", // Hidden - tmux shows its own cursor
 				cursorAccent: "#0a0a0f",
 				selectionBackground: "#facc1540",
 				selectionForeground: "#ffffff",
