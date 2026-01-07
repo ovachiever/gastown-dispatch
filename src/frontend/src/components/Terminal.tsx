@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalProps {
@@ -67,8 +68,10 @@ export function Terminal({
 		// Addons
 		const fitAddon = new FitAddon();
 		const webLinksAddon = new WebLinksAddon();
+		const clipboardAddon = new ClipboardAddon();
 		term.loadAddon(fitAddon);
 		term.loadAddon(webLinksAddon);
+		term.loadAddon(clipboardAddon);
 
 		// Mount terminal
 		term.open(terminalRef.current);
