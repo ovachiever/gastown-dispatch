@@ -9,19 +9,39 @@ html, body, #root {
   padding: 0;
 }
 
+/* Hide horizontal scrollbar globally */
+* {
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 0;
+}
+
+*::-webkit-scrollbar:horizontal {
+  display: none;
+}
+
 body {
   @apply antialiased;
 }
 
 /* xterm.js - let it calculate its own size */
 .xterm {
-  padding: 8px;
+  padding: 4px;
   box-sizing: border-box;
+  overflow: hidden !important;
 }
 
-/* Hide horizontal scrollbar - content should fit */
+/* Hide all xterm scrollbars except vertical */
 .xterm-viewport {
   overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.xterm-screen {
+  overflow: hidden !important;
 }
 
 .xterm-helper-textarea {
