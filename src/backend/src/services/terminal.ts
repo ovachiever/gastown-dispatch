@@ -71,82 +71,44 @@ class TerminalService {
 	}
 
 	private streamWithCapture(session: TerminalSession): void {
-		// Initial capture with full scrollback history
-		this.captureAndSend(session, true);
+		let lastOutput = "";
 
-		// Stream updates - only visible pane (history was sent initially)
-		const streamLoop = () => {
+		// Poll tmux pane content at regular intervals
+		const poll = () => {
 			if (session.ws.readyState !== WebSocket.OPEN) return;
 
-			session.tmuxProc = spawn("bash", [
-				"-c",
-				`while true; do
-					tmux capture-pane -t ${session.pane} -p -e -S - -E -;
-					sleep 0.1;
-				done`,
+			const proc = spawn("tmux", [
+				"capture-pane",
+				"-t",
+				session.pane,
+				"-p",
+				"-e", // Include escape sequences for colors
 			]);
 
-			let lastOutput = "";
+			let output = "";
+			proc.stdout?.on("data", (data: Buffer) => {
+				output += data.toString();
+			});
 
-			session.tmuxProc.stdout?.on("data", (data: Buffer) => {
-				const output = data.toString();
-				// Only send if changed (simple dedup)
+			proc.on("close", () => {
+				// Only send if content changed
 				if (output !== lastOutput) {
 					lastOutput = output;
 					if (session.ws.readyState === WebSocket.OPEN) {
-						session.ws.send(
-							JSON.stringify({
-								type: "output",
-								data: output,
-							}),
-						);
+						session.ws.send(JSON.stringify({ type: "output", data: output }));
 					}
 				}
 			});
-
-			session.tmuxProc.stderr?.on("data", (data: Buffer) => {
-				console.error(`tmux stream error: ${data.toString()}`);
-			});
-
-			session.tmuxProc.on("close", () => {
-				session.tmuxProc = null;
-			});
 		};
 
-		streamLoop();
-	}
+		// Initial capture
+		poll();
 
-	private captureAndSend(session: TerminalSession, withHistory = false): void {
-		const args = [
-			"capture-pane",
-			"-t",
-			session.pane,
-			"-p",
-			"-e", // Include escape sequences for colors
-		];
+		// Start polling interval
+		const intervalId = setInterval(poll, 100);
 
-		if (withHistory) {
-			args.push("-S", "-"); // Start from beginning of scrollback
-			args.push("-E", "-"); // End at bottom
-		}
-
-		const proc = spawn("tmux", args);
-
-		let output = "";
-		proc.stdout?.on("data", (data: Buffer) => {
-			output += data.toString();
-		});
-
-		proc.on("close", () => {
-			if (session.ws.readyState === WebSocket.OPEN) {
-				session.ws.send(
-					JSON.stringify({
-						type: "output",
-						data: output,
-					}),
-				);
-			}
-		});
+		// Store interval for cleanup
+		session.tmuxProc = { kill: () => clearInterval(intervalId) } as any;
 	}
 
 	private sendToTmux(pane: string, keys: string): void {
