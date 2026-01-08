@@ -1,3 +1,129 @@
+:root {
+  /* === Shadow System === */
+  /* Base elevation shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* Special shadows */
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --shadow-glow: 0 0 15px rgb(59 130 246 / 0.5);
+  --shadow-focus: 0 0 0 3px rgb(59 130 246 / 0.3);
+  
+  /* Colored glow variants */
+  --shadow-glow-success: 0 0 15px rgb(34 197 94 / 0.5);
+  --shadow-glow-warning: 0 0 15px rgb(234 179 8 / 0.5);
+  --shadow-glow-error: 0 0 15px rgb(239 68 68 / 0.5);
+  --shadow-glow-info: 0 0 15px rgb(59 130 246 / 0.5);
+  
+  /* Elevation aliases */
+  --elevation-1: var(--shadow-sm);
+  --elevation-2: var(--shadow-md);
+  --elevation-3: var(--shadow-lg);
+  --elevation-4: var(--shadow-xl);
+  --elevation-5: var(--shadow-2xl);
+
+  /* === Animation Tokens === */
+  /* Duration */
+  --duration-instant: 50ms;
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+  
+  /* Easing */
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  
+  /* Stagger delay */
+  --delay-stagger: 50ms;
+
+  /* === Status Colors (HSL) === */
+  --status-online: 142 71% 45%;
+  --status-offline: 0 0% 45%;
+  --status-pending: 45 93% 47%;
+  --status-idle: 262 83% 58%;
+  
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+  
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 0%;
+  
+  --info: 217 91% 60%;
+  --info-foreground: 0 0% 100%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* === Spacing Scale (4px grid) === */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-7: 1.75rem;  /* 28px */
+  --space-8: 2rem;     /* 32px */
+  --space-9: 2.25rem;  /* 36px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-11: 2.75rem; /* 44px */
+  --space-12: 3rem;    /* 48px */
+
+  /* === Surface Gradients === */
+  --gradient-surface: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.05),
+    rgb(255 255 255 / 0)
+  );
+  --gradient-surface-subtle: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.02),
+    rgb(255 255 255 / 0)
+  );
+  --gradient-shine: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.1),
+    rgb(255 255 255 / 0) 50%
+  );
+  --gradient-border: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.1),
+    rgb(255 255 255 / 0.05)
+  );
+  --gradient-overlay: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0),
+    rgb(0 0 0 / 0.2)
+  );
+}
+
+.dark {
+  /* === Shadow System (Dark Mode) === */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  
+  /* Gradients adjusted for dark mode */
+  --gradient-surface: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.1),
+    rgb(255 255 255 / 0)
+  );
+  --gradient-surface-subtle: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.05),
+    rgb(255 255 255 / 0)
+  );
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
