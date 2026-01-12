@@ -1,4 +1,8 @@
-import { runGtJson, runGt } from "../commands/runner.js";
+import { runGtJson, runGt, runBd } from "../commands/runner.js";
+import { listRigs, type RigInfo } from "./rigs.js";
+import { findTownRoot } from "../config/townRoot.js";
+import * as fs from "fs";
+import * as path from "path";
 import type {
 	Convoy,
 	ConvoyCreateRequest,
@@ -9,6 +13,109 @@ import type {
 	StrandedConvoy,
 	SynthesisStatus,
 } from "../types/gasown.js";
+
+// Cache rig list for prefix lookups (refresh every 60s)
+let rigCache: { rigs: RigInfo[]; timestamp: number } | null = null;
+const RIG_CACHE_TTL = 60_000;
+
+async function getCachedRigs(townRoot?: string): Promise<RigInfo[]> {
+	if (rigCache && Date.now() - rigCache.timestamp < RIG_CACHE_TTL) {
+		return rigCache.rigs;
+	}
+	const result = await listRigs(townRoot);
+	rigCache = { rigs: result.rigs, timestamp: Date.now() };
+	return result.rigs;
+}
+
+/**
+ * Find the rig that owns an issue based on its prefix.
+ * e.g., "frfood-xxx" -> rig with beadPrefix "frfood"
+ */
+function findRigByIssueId(issueId: string, rigs: RigInfo[]): RigInfo | null {
+	const dashIdx = issueId.lastIndexOf("-");
+	if (dashIdx === -1) return null;
+	const prefix = issueId.slice(0, dashIdx);
+	return rigs.find((r) => r.beadPrefix === prefix) || null;
+}
+
+/**
+ * Get the actual beads directory for a rig, following redirects if present.
+ */
+function getBeadsPath(rigName: string, townRoot: string): string {
+	const rigPath = path.join(townRoot, rigName);
+	const beadsDir = path.join(rigPath, ".beads");
+	const redirectFile = path.join(beadsDir, "redirect");
+
+	if (fs.existsSync(redirectFile)) {
+		const redirect = fs.readFileSync(redirectFile, "utf-8").trim();
+		return path.join(rigPath, redirect);
+	}
+	return beadsDir;
+}
+
+/**
+ * Resolve external/unknown tracked issues by querying their actual rig's beads DB.
+ * This is a workaround for gt#285 where gt convoy status doesn't resolve cross-rig issues.
+ */
+async function resolveTrackedIssues(
+	tracked: TrackedIssueDetail[],
+	townRoot?: string,
+): Promise<TrackedIssueDetail[]> {
+	const root = townRoot || findTownRoot() || "/Users/erik/gt";
+	const rigs = await getCachedRigs(root);
+
+	const resolved = await Promise.all(
+		tracked.map(async (issue) => {
+			// Only resolve if status is unknown (gt#285 workaround)
+			if (issue.status !== "unknown") {
+				return issue;
+			}
+
+			const rig = findRigByIssueId(issue.id, rigs);
+			if (!rig) {
+				console.debug(
+					`[convoy] Could not find rig for issue ${issue.id} (gt#285 workaround)`,
+				);
+				return issue;
+			}
+
+			try {
+				const beadsPath = getBeadsPath(rig.name, root);
+				console.debug(
+					`[convoy] Resolving external issue ${issue.id} from ${rig.name} (gt#285 workaround)`,
+				);
+
+				const result = await runBd(["show", issue.id, "--json"], {
+					cwd: beadsPath,
+					timeout: 5000,
+				});
+
+				if (result.exitCode === 0) {
+					const data = JSON.parse(result.stdout);
+					// bd show --json returns an array
+					const beadData = Array.isArray(data) ? data[0] : data;
+					if (beadData) {
+						return {
+							...issue,
+							title: beadData.title || issue.title,
+							status: beadData.status || issue.status,
+							assignee: beadData.assignee || issue.assignee,
+							issue_type: beadData.type || issue.issue_type,
+						};
+					}
+				}
+			} catch (err) {
+				console.debug(
+					`[convoy] Failed to resolve issue ${issue.id}: ${err} (gt#285 workaround)`,
+				);
+			}
+
+			return issue;
+		}),
+	);
+
+	return resolved;
+}
 
 export async function listConvoys(
 	status?: "open" | "closed",
@@ -166,7 +273,7 @@ export async function getConvoyDetail(
 	const metadata = parseConvoyDescription(convoyBasic?.description);
 
 	// Transform tracked issues
-	const trackedIssues: TrackedIssueDetail[] = (statusData.tracked || []).map(
+	let trackedIssues: TrackedIssueDetail[] = (statusData.tracked || []).map(
 		(t) => ({
 			id: t.id,
 			title: t.title,
@@ -178,6 +285,9 @@ export async function getConvoyDetail(
 			dependency_type: t.dependency_type,
 		}),
 	);
+
+	// Resolve external issues that gt couldn't look up (gt#285 workaround)
+	trackedIssues = await resolveTrackedIssues(trackedIssues, townRoot);
 
 	// Extract workers from tracked issues
 	const workers: WorkerInfo[] = trackedIssues
