@@ -32,6 +32,9 @@ import {
 	addCrew,
 	nudgeAgent,
 	runDoctor,
+	addPolecat,
+	removePolecat,
+	nukePolecat,
 } from "../services/actions.js";
 import {
 	listRigs,
@@ -358,6 +361,39 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const { fix } = req.body;
 		const result = await runDoctor(fix === true, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/actions/polecat/add",
+	asyncHandler(async (req, res) => {
+		const { rig, name } = req.body;
+		const result = await addPolecat(rig, name, getTownRoot(req));
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
+router.delete(
+	"/actions/polecat/:rig/:name",
+	asyncHandler(async (req, res) => {
+		const result = await removePolecat(
+			req.params.rig,
+			req.params.name,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/actions/polecat/:rig/:name/nuke",
+	asyncHandler(async (req, res) => {
+		const result = await nukePolecat(
+			req.params.rig,
+			req.params.name,
+			getTownRoot(req),
+		);
 		res.json(result);
 	}),
 );

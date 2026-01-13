@@ -223,3 +223,40 @@ export async function runDoctor(fix?: boolean): Promise<ActionResult> {
 		body: JSON.stringify({ fix }),
 	});
 }
+
+export async function addPolecat(data: {
+	rig: string;
+	name: string;
+}): Promise<ActionResult> {
+	return fetchJson<ActionResult>("/actions/polecat/add", {
+		method: "POST",
+		body: JSON.stringify(data),
+	});
+}
+
+export async function removePolecat(
+	rig: string,
+	name: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/actions/polecat/${encodeURIComponent(rig)}/${encodeURIComponent(name)}`,
+		{ method: "DELETE" },
+	);
+}
+
+export async function nukePolecat(
+	rig: string,
+	name: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/actions/polecat/${encodeURIComponent(rig)}/${encodeURIComponent(name)}/nuke`,
+		{ method: "POST" },
+	);
+}
+
+export async function nudge(agent: string, message: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>("/actions/nudge", {
+		method: "POST",
+		body: JSON.stringify({ agent, message }),
+	});
+}

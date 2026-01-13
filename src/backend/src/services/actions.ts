@@ -218,3 +218,81 @@ export async function restartMayor(townRoot?: string): Promise<ActionResult> {
 		message: "Mayor restarted successfully",
 	};
 }
+
+export async function addPolecat(
+	rigName: string,
+	polecatName: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runGt(
+		["polecat", "add", polecatName, "--rig", rigName],
+		{
+			cwd: townRoot,
+			timeout: 60_000,
+		},
+	);
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to add polecat",
+			error: result.stderr,
+		};
+	}
+
+	invalidateStatusCache();
+	return {
+		success: true,
+		message: `Added polecat: ${polecatName} to ${rigName}`,
+	};
+}
+
+export async function removePolecat(
+	rigName: string,
+	polecatName: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runGt(["polecat", "remove", polecatName, "--rig", rigName], {
+		cwd: townRoot,
+		timeout: 30_000,
+	});
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to remove polecat",
+			error: result.stderr,
+		};
+	}
+
+	invalidateStatusCache();
+	return {
+		success: true,
+		message: `Removed polecat: ${polecatName} from ${rigName}`,
+	};
+}
+
+export async function nukePolecat(
+	rigName: string,
+	polecatName: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runGt(["polecat", "nuke", polecatName, "--rig", rigName], {
+		cwd: townRoot,
+		timeout: 30_000,
+	});
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to nuke polecat",
+			error: result.stderr,
+		};
+	}
+
+	invalidateStatusCache();
+	return {
+		success: true,
+		message: `Nuked polecat: ${polecatName} from ${rigName}`,
+	};
+}

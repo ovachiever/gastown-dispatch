@@ -1,10 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Users, Terminal, MessageSquare, AlertTriangle } from "lucide-react";
-import { getStatus } from "@/lib/api";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw, AlertTriangle, Users } from "lucide-react";
+import { getStatus, removePolecat, nukePolecat } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { AgentRuntime, RigStatus } from "@/types/api";
+import { AgentTree } from "@/components/AgentTree";
+import { AgentDetail } from "@/components/AgentDetail";
+import { NudgeModal } from "@/components/NudgeModal";
+import { AddPolecatModal } from "@/components/AddPolecatModal";
+import type { AgentRuntime } from "@/types/api";
 
 export default function Agents() {
+	const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+	const [nudgeModal, setNudgeModal] = useState<{ address: string; name: string } | null>(null);
+	const [addPolecatModal, setAddPolecatModal] = useState<string | null>(null);
+	const queryClient = useQueryClient();
+
 	const {
 		data: response,
 		isLoading,
@@ -15,6 +25,24 @@ export default function Agents() {
 		queryKey: ["status"],
 		queryFn: getStatus,
 		refetchInterval: 10_000,
+	});
+
+	const removeMutation = useMutation({
+		mutationFn: ({ rig, name }: { rig: string; name: string }) =>
+			removePolecat(rig, name),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["status"] });
+			setSelectedAgent(null);
+		},
+	});
+
+	const nukeMutation = useMutation({
+		mutationFn: ({ rig, name }: { rig: string; name: string }) =>
+			nukePolecat(rig, name),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["status"] });
+			setSelectedAgent(null);
+		},
 	});
 
 	if (isLoading) {
@@ -61,22 +89,67 @@ export default function Agents() {
 	}
 
 	const status = response.status;
+	const globalAgents = status.agents || [];
+	const rigs = status.rigs || [];
 
-	// Collect all agents from global + rig-level
+	// Collect all agents
 	const allAgents: AgentRuntime[] = [
-		...(status.agents || []),
-		...(status.rigs?.flatMap((rig: RigStatus) => rig.agents || []) || []),
+		...globalAgents,
+		...rigs.flatMap((rig) => rig.agents || []),
 	];
 
-	const globalAgents = status.agents || [];
+	const agent = allAgents.find((a) => a.address === selectedAgent);
 
-	// rigAgents used for future features
-	void allAgents;
+	const handleNudge = (address: string) => {
+		const agent = allAgents.find((a) => a.address === address);
+		if (agent) {
+			setNudgeModal({ address, name: agent.name });
+		}
+	};
+
+	const handleTerminal = (address: string) => {
+		console.log("Open terminal for:", address);
+		// TODO: Implement terminal integration
+	};
+
+	const handleRemove = (address: string) => {
+		const agent = allAgents.find((a) => a.address === address);
+		if (!agent) return;
+
+		// Extract rig name from address (format: rig/polecat/name)
+		const parts = address.split("/");
+		if (parts.length >= 3) {
+			const rigName = parts[0];
+			const polecatName = parts[2];
+			if (confirm(`Remove polecat ${polecatName} from ${rigName}?`)) {
+				removeMutation.mutate({ rig: rigName, name: polecatName });
+			}
+		}
+	};
+
+	const handleNuke = (address: string) => {
+		const agent = allAgents.find((a) => a.address === address);
+		if (!agent) return;
+
+		// Extract rig name from address
+		const parts = address.split("/");
+		if (parts.length >= 3) {
+			const rigName = parts[0];
+			const polecatName = parts[2];
+			if (
+				confirm(
+					`NUKE polecat ${polecatName}? This will forcefully destroy the worktree and branch. This cannot be undone.`,
+				)
+			) {
+				nukeMutation.mutate({ rig: rigName, name: polecatName });
+			}
+		}
+	};
 
 	return (
-		<div className="p-6">
+		<div className="h-screen flex flex-col">
 			{/* Header */}
-			<div className="flex items-center justify-between mb-6">
+			<div className="flex items-center justify-between p-6 border-b border-gt-border bg-gt-bg">
 				<div>
 					<h1 className="text-2xl font-semibold">Agents</h1>
 					<p className="text-sm text-gt-muted">
@@ -95,160 +168,68 @@ export default function Agents() {
 				</div>
 			</div>
 
-			{/* Global Agents */}
-			<section className="mb-8">
-				<h2 className="text-lg font-medium mb-3">Global Agents</h2>
-				<p className="text-sm text-gt-muted mb-4">
-					Town-wide coordinators that manage cross-project work
-				</p>
-				<div className="grid grid-cols-2 gap-4">
-					{globalAgents.map((agent) => (
-						<AgentCard key={agent.address} agent={agent} />
-					))}
-				</div>
-			</section>
-
-			{/* Rig Agents by Rig */}
-			{status?.rigs?.map((rig) => (
-				<section key={rig.name} className="mb-8">
-					<h2 className="text-lg font-medium mb-3">{rig.name}</h2>
-					<div className="grid grid-cols-2 gap-4">
-						{rig.agents?.map((agent) => (
-							<AgentCard key={agent.address} agent={agent} />
-						))}
-						{/* Show polecat placeholders if no agent info */}
-						{!rig.agents?.length && rig.polecats.length > 0 && (
-							<>
-								{rig.polecats.map((name) => (
-									<div
-										key={name}
-										className="bg-gt-surface border border-gt-border rounded-lg p-4"
-									>
-										<div className="flex items-center gap-3">
-											<div className="w-2 h-2 rounded-full bg-green-400" />
-											<div>
-												<span className="font-medium">{name}</span>
-												<span className="ml-2 text-xs text-gt-muted bg-gt-bg px-2 py-0.5 rounded">
-													polecat
-												</span>
-											</div>
-										</div>
-									</div>
-								))}
-							</>
-						)}
-					</div>
-					{!rig.agents?.length && rig.polecats.length === 0 && (
-						<div className="bg-gt-surface border border-gt-border rounded-lg p-6 text-center">
-							<p className="text-gt-muted">No active agents in this rig</p>
+			{/* Master-Detail Layout */}
+			<div className="flex-1 flex overflow-hidden">
+				{allAgents.length === 0 ? (
+					<div className="flex-1 flex items-center justify-center">
+						<div className="text-center">
+							<Users className="mx-auto text-gt-muted mb-4" size={48} />
+							<p className="text-gt-muted mb-2">No agents running</p>
+							<p className="text-sm text-gt-muted">
+								Start Gas Town to bring up the Mayor and Deacon.
+							</p>
 						</div>
-					)}
-				</section>
-			))}
+					</div>
+				) : (
+					<>
+						{/* Agent Tree (Master) */}
+						<div className="w-80 border-r border-gt-border">
+							<AgentTree
+								globalAgents={globalAgents}
+								rigs={rigs}
+								selectedAgent={selectedAgent}
+								onSelectAgent={setSelectedAgent}
+								onAddPolecat={setAddPolecatModal}
+							/>
+						</div>
 
-			{allAgents.length === 0 && (
-				<div className="bg-gt-surface border border-gt-border rounded-lg p-8 text-center">
-					<Users className="mx-auto text-gt-muted mb-4" size={48} />
-					<p className="text-gt-muted mb-2">No agents running</p>
-					<p className="text-sm text-gt-muted">
-						Start Gas Town to bring up the Mayor and Deacon.
-					</p>
-				</div>
-			)}
-		</div>
-	);
-}
-
-function AgentCard({
-	agent,
-}: {
-	agent: {
-		name: string;
-		address: string;
-		role: string;
-		running: boolean;
-		has_work: boolean;
-		work_title?: string;
-		state?: string;
-		unread_mail: number;
-		first_subject?: string;
-	};
-}) {
-	const getRoleColor = (role: string) => {
-		switch (role) {
-			case "mayor":
-				return "bg-purple-900/50 text-purple-300";
-			case "deacon":
-				return "bg-blue-900/50 text-blue-300";
-			case "witness":
-				return "bg-cyan-900/50 text-cyan-300";
-			case "refinery":
-				return "bg-amber-900/50 text-amber-300";
-			case "polecat":
-				return "bg-green-900/50 text-green-300";
-			case "crew":
-				return "bg-pink-900/50 text-pink-300";
-			default:
-				return "bg-gray-800 text-gray-300";
-		}
-	};
-
-	return (
-		<div className="bg-gt-surface border border-gt-border rounded-lg p-4">
-			<div className="flex items-center justify-between mb-2">
-				<div className="flex items-center gap-2">
-					<div
-						className={cn(
-							"w-2 h-2 rounded-full",
-							agent.running ? "bg-green-400" : "bg-gray-500",
-						)}
-					/>
-					<span className="font-medium">{agent.name}</span>
-					<span
-						className={cn(
-							"text-xs px-2 py-0.5 rounded",
-							getRoleColor(agent.role),
-						)}
-					>
-						{agent.role}
-					</span>
-				</div>
-				{agent.state && (
-					<span className="text-xs text-gt-muted">{agent.state}</span>
+						{/* Agent Detail (Detail) */}
+						<div className="flex-1">
+							{agent ? (
+								<AgentDetail
+									agent={agent}
+									onNudge={handleNudge}
+									onTerminal={handleTerminal}
+									onRemove={handleRemove}
+									onNuke={handleNuke}
+								/>
+							) : (
+								<div className="h-full flex items-center justify-center">
+									<p className="text-gt-muted">
+										Select an agent to view details
+									</p>
+								</div>
+							)}
+						</div>
+					</>
 				)}
 			</div>
 
-			<p className="text-sm text-gt-muted mb-3">{agent.address}</p>
-
-			{agent.has_work && agent.work_title && (
-				<p className="text-sm mb-3 truncate">
-					<span className="text-gt-muted">📌</span> {agent.work_title}
-				</p>
+			{/* Modals */}
+			{nudgeModal && (
+				<NudgeModal
+					agentAddress={nudgeModal.address}
+					agentName={nudgeModal.name}
+					onClose={() => setNudgeModal(null)}
+				/>
 			)}
 
-			{agent.unread_mail > 0 && (
-				<p className="text-sm text-amber-400 mb-3">
-					📬 {agent.unread_mail} unread
-					{agent.first_subject && `: ${agent.first_subject}`}
-				</p>
+			{addPolecatModal && (
+				<AddPolecatModal
+					rigName={addPolecatModal}
+					onClose={() => setAddPolecatModal(null)}
+				/>
 			)}
-
-			<div className="flex gap-2">
-				<button
-					className="flex items-center gap-1 px-2 py-1 text-xs bg-gt-bg rounded hover:bg-gt-border transition-colors"
-					title="Open terminal"
-				>
-					<Terminal size={12} />
-					Terminal
-				</button>
-				<button
-					className="flex items-center gap-1 px-2 py-1 text-xs bg-gt-bg rounded hover:bg-gt-border transition-colors"
-					title="Send message"
-				>
-					<MessageSquare size={12} />
-					Nudge
-				</button>
-			</div>
 		</div>
 	);
 }
