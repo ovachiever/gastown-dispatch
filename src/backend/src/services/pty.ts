@@ -14,8 +14,10 @@ export class PtyService {
 	 * Create a PTY session that attaches to a tmux pane and streams output
 	 */
 	createSession(ws: WebSocket, pane: string): void {
-		// Spawn PTY attached to tmux pane
-		const pty = ptySpawn("tmux", ["attach", "-t", pane], {
+		// Spawn shell that attaches to tmux pane
+		// Using bash -c ensures proper terminal allocation for tmux
+		const shell = process.env.SHELL || "/bin/bash";
+		const pty = ptySpawn(shell, ["-c", `tmux attach-session -t "${pane}"`], {
 			name: "xterm-256color",
 			cols: 80,
 			rows: 24,
