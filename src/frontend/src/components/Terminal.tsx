@@ -41,6 +41,12 @@ export function Terminal({
 			lineHeight: 1.2,
 			letterSpacing: 0,
 			scrollOnUserInput: true,
+			// Enable text selection with modifier keys even when apps use mouse mode
+			// On macOS: hold Option/Alt to select text
+			// On Windows/Linux: hold Shift to select text
+			macOptionClickForcesSelection: true,
+			// Enable word selection on right-click (standard macOS behavior)
+			rightClickSelectsWord: true,
 			theme: {
 				background: "#0a0a0f", // Deep dark - the void
 				foreground: "#e4e4e7", // Soft white
