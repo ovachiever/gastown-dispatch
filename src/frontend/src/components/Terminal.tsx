@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { ClipboardAddon } from "@xterm/addon-clipboard";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalProps {
@@ -80,23 +79,25 @@ export function Terminal({
 		// Addons
 		const fitAddon = new FitAddon();
 		const webLinksAddon = new WebLinksAddon();
-		const clipboardAddon = new ClipboardAddon();
 		term.loadAddon(fitAddon);
 		term.loadAddon(webLinksAddon);
-		term.loadAddon(clipboardAddon);
 
 		// Mount terminal
 		term.open(terminalRef.current);
 		fitAddon.fit();
 
 		// Enable copy-on-select with DEBUG LOGGING
+		// Track last selection to prevent spam from empty/duplicate events
+		let lastSelection = '';
 		term.onSelectionChange(() => {
 			console.log('[Terminal] Selection changed event fired');
 			const selection = term.getSelection();
 			console.log('[Terminal] Selection length:', selection?.length, 'chars');
 			console.log('[Terminal] Selection text:', selection?.substring(0, 50));
 
-			if (selection) {
+			// Guard: Only process if selection actually changed and is non-empty
+			if (selection && selection !== lastSelection && selection.length > 0) {
+				lastSelection = selection;
 				navigator.clipboard.writeText(selection)
 					.then(() => {
 						console.log('[Terminal] ✓ Successfully copied to clipboard');
@@ -105,9 +106,38 @@ export function Terminal({
 						console.error('[Terminal] ✗ Clipboard write failed:', err);
 					});
 			} else {
-				console.log('[Terminal] No selection to copy');
+				console.log('[Terminal] No selection to copy (empty or duplicate)');
 			}
 		});
+
+		// DEBUG: Add mouse event listeners to verify events reach terminal
+		const terminalElement = terminalRef.current;
+		const handleMouseDown = (e: MouseEvent) => {
+			console.log('[Terminal] mousedown:', {
+				target: (e.target as HTMLElement)?.className,
+				button: e.button,
+				clientX: e.clientX,
+				clientY: e.clientY,
+			});
+		};
+		const handleMouseUp = (e: MouseEvent) => {
+			console.log('[Terminal] mouseup:', {
+				target: (e.target as HTMLElement)?.className,
+				button: e.button,
+			});
+		};
+		let mouseMoveCount = 0;
+		const handleMouseMove = (e: MouseEvent) => {
+			// Only log every 10th mousemove to avoid spam
+			if (mouseMoveCount++ % 10 === 0) {
+				console.log('[Terminal] mousemove (sampled):', {
+					target: (e.target as HTMLElement)?.className,
+				});
+			}
+		};
+		terminalElement.addEventListener('mousedown', handleMouseDown);
+		terminalElement.addEventListener('mouseup', handleMouseUp);
+		terminalElement.addEventListener('mousemove', handleMouseMove);
 
 		xtermRef.current = term;
 		fitAddonRef.current = fitAddon;
@@ -240,6 +270,10 @@ export function Terminal({
 			fitTimeouts.forEach(clearTimeout);
 			window.removeEventListener("resize", handleResize);
 			resizeObserver.disconnect();
+			// Remove DEBUG mouse event listeners
+			terminalElement.removeEventListener('mousedown', handleMouseDown);
+			terminalElement.removeEventListener('mouseup', handleMouseUp);
+			terminalElement.removeEventListener('mousemove', handleMouseMove);
 			ws.close();
 			term.dispose();
 		};
