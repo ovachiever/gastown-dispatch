@@ -64,12 +64,13 @@ function DigitalCounter({ value, label, color = "text-green-400", digits = 3 }: 
 }
 
 // Queue level indicator (industrial silo style)
-function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
+function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive = false }: {
 	pending: number;
 	inFlight: number;
 	blocked: number;
 	max?: number;
 	label: string;
+	isRigActive?: boolean;
 }) {
 	const total = pending + inFlight + blocked;
 	const fillPercent = Math.min(100, (total / max) * 100);
@@ -77,10 +78,13 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
 	const hasBlocked = blocked > 0;
 
 	return (
-		<div className="flex flex-col items-center flex-shrink-0">
+		<div className={cn("flex flex-col items-center flex-shrink-0", !isRigActive && "opacity-50")}>
 			<div className={cn(
 				"text-[10px] uppercase mb-2 font-bold tracking-wide text-center max-w-[80px] truncate",
-				hasBlocked ? "text-red-400" : isActive ? "text-blue-400" : "text-slate-500"
+				!isRigActive ? "text-slate-600" :
+				hasBlocked ? "text-red-400" :
+				isActive ? "text-blue-400" :
+				"text-slate-400"
 			)} title={label}>
 				{label}
 			</div>
@@ -90,13 +94,14 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
 				{/* Top cone (hopper style) */}
 				<div className="w-20 h-4 relative">
 					<svg viewBox="0 0 80 16" className="w-full h-full">
-						<path d="M0,16 L40,0 L80,16 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
+						<path d="M0,16 L40,0 L80,16 Z" fill={isRigActive ? "#1e293b" : "#0f172a"} stroke={isRigActive ? "#475569" : "#334155"} strokeWidth="1" />
 					</svg>
 				</div>
 
 				{/* Main silo body */}
 				<div className={cn(
 					"relative w-20 h-28 border-2 rounded-b-lg overflow-hidden",
+					!isRigActive ? "border-slate-700 bg-slate-900/30" :
 					hasBlocked ? "border-red-500 bg-red-950/30" :
 					isActive ? "border-blue-500 bg-blue-950/30" :
 					"border-slate-600 bg-slate-900/50"
@@ -219,20 +224,25 @@ function RigStation({ rig, agents, isActive }: {
 	return (
 		<div className={cn(
 			"bg-slate-900/80 border rounded-lg p-3 backdrop-blur-sm transition-all",
-			isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700"
+			isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700 opacity-60"
 		)}>
 			{/* Header */}
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
-					<Server size={14} className="text-blue-400" />
-					<span className="font-mono text-sm font-bold text-slate-200 uppercase">
+					<Server size={14} className={isActive ? "text-blue-400" : "text-slate-600"} />
+					<span className={cn(
+						"font-mono text-sm font-bold uppercase",
+						isActive ? "text-slate-200" : "text-slate-500"
+					)}>
 						{rig.name}
 					</span>
 				</div>
-				<StatusIndicator
-					status={mq.state === "blocked" ? "error" : mq.state === "processing" ? "processing" : isActive ? "active" : "idle"}
-					pulse={mq.state === "processing"}
-				/>
+				{isActive && (
+					<StatusIndicator
+						status={mq.state === "blocked" ? "error" : mq.state === "processing" ? "processing" : "active"}
+						pulse={mq.state === "processing"}
+					/>
+				)}
 			</div>
 
 			{/* Worker counts */}
@@ -240,19 +250,19 @@ function RigStation({ rig, agents, isActive }: {
 				<DigitalCounter
 					value={rig.polecat_count}
 					label="Polecats"
-					color={rig.polecat_count > 0 ? "text-blue-400" : "text-slate-500"}
+					color={isActive && rig.polecat_count > 0 ? "text-blue-400" : "text-slate-600"}
 					digits={2}
 				/>
 				<DigitalCounter
 					value={rig.crew_count}
 					label="Crew"
-					color={rig.crew_count > 0 ? "text-green-400" : "text-slate-500"}
+					color={isActive && rig.crew_count > 0 ? "text-green-400" : "text-slate-600"}
 					digits={2}
 				/>
 				<DigitalCounter
 					value={workingAgents.length}
 					label="Active"
-					color={workingAgents.length > 0 ? "text-yellow-400" : "text-slate-500"}
+					color={isActive && workingAgents.length > 0 ? "text-yellow-400" : "text-slate-600"}
 					digits={2}
 				/>
 			</div>
@@ -855,6 +865,25 @@ export default function Overview() {
 		setLoadTimeout(false);
 	}, [statusLoading]);
 
+	// Determine if we have a valid connection - must be before conditional returns
+	const isConnected = statusResponse?.initialized && statusResponse.status;
+	const status = statusResponse?.status;
+	const deaconRunning = status?.agents?.some((a: AgentRuntime) => a.name === "deacon" && a.running) ?? false;
+
+	// Sort rigs to show active ones (with workers) first - must be before conditional returns
+	const sortedRigs = useMemo(() => {
+		if (!status?.rigs) return [];
+		return [...status.rigs].sort((a, b) => {
+			// Active rigs (has polecats or crew) come first
+			const aActive = (a.polecat_count > 0 || a.crew_count > 0);
+			const bActive = (b.polecat_count > 0 || b.crew_count > 0);
+			if (aActive && !bActive) return -1;
+			if (!aActive && bActive) return 1;
+			// Then sort by name
+			return a.name.localeCompare(b.name);
+		});
+	}, [status?.rigs]);
+
 	// Show loading while initial fetch is in progress (but only for 3 seconds)
 	if (statusLoading && !loadTimeout) {
 		return (
@@ -866,11 +895,6 @@ export default function Overview() {
 			</div>
 		);
 	}
-
-	// Determine if we have a valid connection
-	const isConnected = statusResponse?.initialized && statusResponse.status;
-	const status = statusResponse?.status;
-	const deaconRunning = status?.agents?.some((a: AgentRuntime) => a.name === "deacon" && a.running) ?? false;
 
 	// Show disconnected state if not connected
 	if (!isConnected || !status) {
@@ -966,17 +990,18 @@ export default function Overview() {
 								<span className="text-xs text-slate-400">({status.rigs.length} rigs)</span>
 							</div>
 							<div className="overflow-y-auto flex-1">
-								{status.rigs.length === 0 ? (
+								{sortedRigs.length === 0 ? (
 									<div className="text-sm text-slate-500">No rigs configured</div>
 								) : (
 									<div className="grid grid-cols-9 gap-4 justify-items-center">
-										{status.rigs.map((rig: RigStatus) => (
+										{sortedRigs.map((rig: RigStatus) => (
 											<QueueLevel
 												key={rig.name}
 												label={rig.name.slice(0, 12)}
 												pending={rig.mq?.pending || 0}
 												inFlight={rig.mq?.in_flight || 0}
 												blocked={rig.mq?.blocked || 0}
+												isRigActive={rig.polecat_count > 0 || rig.crew_count > 0}
 											/>
 										))}
 									</div>
@@ -991,17 +1016,17 @@ export default function Overview() {
 							<Server size={16} className="text-blue-400" />
 							<span className="text-sm font-semibold text-slate-200">Rig Stations</span>
 						</div>
-						{status.rigs.length === 0 ? (
+						{sortedRigs.length === 0 ? (
 							<div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4">
 								<div className="text-sm text-slate-500 text-center">No rigs configured</div>
 							</div>
 						) : (
-							status.rigs.map((rig: RigStatus) => (
+							sortedRigs.map((rig: RigStatus) => (
 								<RigStation
 									key={rig.name}
 									rig={rig}
 									agents={status.agents}
-									isActive={deaconRunning}
+									isActive={rig.polecat_count > 0 || rig.crew_count > 0}
 								/>
 							))
 						)}
