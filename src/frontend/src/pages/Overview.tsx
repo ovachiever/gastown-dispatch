@@ -202,8 +202,8 @@ function RigStation({ rig, agents, isActive }: {
 }) {
 	const rigAgents = agents.filter(a =>
 		a.address.includes(rig.name) ||
-		rig.polecats.some(p => a.name.includes(p)) ||
-		rig.crews.some(c => a.name.includes(c))
+		rig.polecats?.some(p => a.name.includes(p)) ||
+		rig.crews?.some(c => a.name.includes(c))
 	);
 	const workingAgents = rigAgents.filter(a => a.has_work);
 	const mq = rig.mq || { pending: 0, in_flight: 0, blocked: 0, state: "idle", health: "empty" };
