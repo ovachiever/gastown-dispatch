@@ -277,26 +277,33 @@ function SynthesisPanel({
 	detail,
 	onStartSynthesis,
 	isStarting,
+	onClose,
+	isClosing,
 }: {
 	detail: ConvoyDetail;
 	onStartSynthesis: (rig?: string) => void;
 	isStarting: boolean;
+	onClose?: () => void;
+	isClosing?: boolean;
 }) {
 	const [showStartModal, setShowStartModal] = useState(false);
 	const [selectedRig, setSelectedRig] = useState("");
+
+	// Check if this convoy needs synthesis (has formula or molecule)
+	const needsSynthesis = !!(detail.formula || detail.molecule);
 
 	// Query synthesis status for more details
 	const { data: synthesisStatus } = useQuery({
 		queryKey: ["synthesis-status", detail.id],
 		queryFn: () => getSynthesisStatus(detail.id),
-		enabled: detail.status === "open",
+		enabled: detail.status === "open" && needsSynthesis,
 		refetchInterval: 10_000,
 	});
 
 	const incompleteLegCount = synthesisStatus?.incomplete_legs?.length ?? 0;
 	const isReady = detail.synthesis_ready || synthesisStatus?.ready;
 
-	// Don't show panel for closed convoys or convoys with no legs
+	// Don't show panel for closed convoys
 	if (detail.status === "closed") return null;
 
 	const handleStartClick = () => {
@@ -309,6 +316,83 @@ function SynthesisPanel({
 		setSelectedRig("");
 	};
 
+	// Simple tracking convoy (no synthesis needed)
+	if (!needsSynthesis) {
+		const allComplete = detail.total > 0 && detail.completed === detail.total;
+
+		return (
+			<div
+				className={cn(
+					"rounded-lg p-4 border",
+					allComplete
+						? "bg-green-900/20 border-green-500/50"
+						: "bg-gt-surface border-gt-border",
+				)}
+			>
+				<div className="flex items-center justify-between mb-3">
+					<div className="flex items-center gap-2">
+						<Truck
+							size={18}
+							className={allComplete ? "text-green-400" : "text-gt-muted"}
+						/>
+						<h3
+							className={cn(
+								"font-medium",
+								allComplete ? "text-green-300" : "text-gt-text",
+							)}
+						>
+							Tracking Convoy
+						</h3>
+					</div>
+					{allComplete && (
+						<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-300">
+							<CheckCircle2 size={12} />
+							Complete
+						</span>
+					)}
+				</div>
+
+				{allComplete ? (
+					<>
+						<p className="text-sm text-green-200/70 mb-3">
+							All tracked issues are complete. You can now close this convoy.
+						</p>
+						<button
+							onClick={onClose}
+							disabled={!onClose || isClosing}
+							className="flex items-center gap-2 px-3 py-1.5 rounded bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+						>
+							{isClosing ? (
+								<>
+									<Loader2 className="animate-spin" size={14} />
+									Closing...
+								</>
+							) : (
+								<>
+									<CheckCircle2 size={14} />
+									Close Convoy
+								</>
+							)}
+						</button>
+					</>
+				) : (
+					<>
+						<p className="text-sm text-gt-muted mb-3">
+							This is a simple tracking convoy. It will be ready to close once
+							all tracked issues are complete.
+						</p>
+						<div className="flex items-center gap-2">
+							<span className="text-xs text-gt-muted">
+								{detail.completed ?? 0} of {detail.total ?? 0} complete
+							</span>
+						</div>
+					</>
+				)}
+			</div>
+		);
+	}
+
+	// Formula-driven convoy (needs synthesis)
 	return (
 		<div
 			className={cn(
@@ -872,6 +956,8 @@ function ConvoyDetailPanel({
 					detail={detail}
 					onStartSynthesis={(rig) => synthesisMutation.mutate(rig)}
 					isStarting={synthesisMutation.isPending}
+				onClose={() => closeMutation.mutate()}
+				isClosing={closeMutation.isPending}
 				/>
 
 				{/* Tracked Issues - now with remove capability for open convoys */}
