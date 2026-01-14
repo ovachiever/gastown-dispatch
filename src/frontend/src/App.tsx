@@ -23,7 +23,7 @@ import Rigs from "@/pages/Rigs";
 
 const navItems = [
 	{ to: "/overview", icon: LayoutDashboard, label: "Overview" },
-	{ to: "/dispatch", icon: MessageSquare, label: "Dispatch" },
+	{ to: "/dispatch", icon: MessageSquare, label: "Mayor" },
 	{ to: "/convoys", icon: Truck, label: "Convoys" },
 	{ to: "/beads", icon: CircleDot, label: "Beads" },
 	{ to: "/rigs", icon: HardDrive, label: "Rigs" },
