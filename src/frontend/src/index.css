@@ -173,7 +173,6 @@ body {
 .xterm-helper-textarea {
   position: absolute !important;
   opacity: 0 !important;
-  pointer-events: none !important;
 }
 
 /* Custom scrollbar */
