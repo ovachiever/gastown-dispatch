@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { getStatus } from "@/lib/api";
 import { SchematicNode, NodeStatus } from "./SchematicNode";
+import { AgentNode } from "./AgentNode";
+import { RigNode } from "./RigNode";
 import { RefreshCw } from "lucide-react";
 
 interface Connection {
@@ -104,23 +106,6 @@ export function SystemSchematic() {
 	});
 
 	// Determine node statuses
-	const getMayorStatus = (): NodeStatus => {
-		if (!mayor) return "offline";
-		if (mayor.running) return "active";
-		return "idle";
-	};
-
-	const getDeaconStatus = (): NodeStatus => {
-		if (!deacon) return "offline";
-		if (deacon.running) return "active";
-		return "idle";
-	};
-
-	const getRigStatus = (_rig: any): NodeStatus => {
-		// For now, rigs are considered active if deacon is running
-		return deacon?.running ? "active" : "idle";
-	};
-
 	const getPolecatStatus = (): NodeStatus => {
 		// Polecats are active if their rig is active
 		return deacon?.running ? "active" : "idle";
@@ -163,44 +148,19 @@ export function SystemSchematic() {
 				</g>
 
 				{/* Mayor node */}
-				{mayor && (
-					<SchematicNode
-						id={mayor.address}
-						label={mayor.name}
-						type="mayor"
-						status={getMayorStatus()}
-						x={mayorPos.x}
-						y={mayorPos.y}
-						workCount={mayor.has_work ? 1 : 0}
-						detailPath={`/agents/${mayor.address}`}
-					/>
-				)}
+				{mayor && <AgentNode agent={mayor} x={mayorPos.x} y={mayorPos.y} />}
 
 				{/* Deacon node */}
-				{deacon && (
-					<SchematicNode
-						id={deacon.address}
-						label={deacon.name}
-						type="deacon"
-						status={getDeaconStatus()}
-						x={deaconPos.x}
-						y={deaconPos.y}
-						workCount={deacon.has_work ? 1 : 0}
-						detailPath={`/agents/${deacon.address}`}
-					/>
-				)}
+				{deacon && <AgentNode agent={deacon} x={deaconPos.x} y={deaconPos.y} />}
 
 				{/* Rig nodes */}
 				{rigs.map((rig, index) => (
-					<SchematicNode
+					<RigNode
 						key={rig.name}
-						id={rig.name}
-						label={rig.name}
-						type="rig"
-						status={getRigStatus(rig)}
+						rig={rig}
 						x={rigPositions[index].x}
 						y={rigPositions[index].y}
-						detailPath={`/rigs/${rig.name}`}
+						isActive={deacon?.running || false}
 					/>
 				))}
 
