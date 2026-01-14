@@ -83,6 +83,17 @@ export function Terminal({
 		term.open(terminalRef.current);
 		fitAddon.fit();
 
+		// Enable copy-on-select (macOS terminal behavior)
+		term.onSelectionChange(() => {
+			const selection = term.getSelection();
+			if (selection) {
+				// Auto-copy selection to clipboard
+				navigator.clipboard.writeText(selection).catch(() => {
+					// Ignore clipboard errors (e.g., permissions)
+				});
+			}
+		});
+
 		xtermRef.current = term;
 		fitAddonRef.current = fitAddon;
 
