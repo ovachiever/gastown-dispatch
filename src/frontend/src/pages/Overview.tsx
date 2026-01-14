@@ -80,7 +80,7 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 	return (
 		<div className={cn("flex flex-col items-center flex-shrink-0", !isRigActive && "opacity-50")}>
 			<div className={cn(
-				"text-[8px] sm:text-[9px] lg:text-[10px] uppercase mb-1 sm:mb-1.5 lg:mb-2 font-bold tracking-wide text-center max-w-[50px] sm:max-w-[60px] lg:max-w-[80px] truncate",
+				"text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px] uppercase mb-1 sm:mb-1.5 lg:mb-2 font-bold tracking-wide text-center max-w-[40px] sm:max-w-[55px] md:max-w-[65px] lg:max-w-[80px] truncate",
 				!isRigActive ? "text-slate-600" :
 				hasBlocked ? "text-red-400" :
 				isActive ? "text-blue-400" :
@@ -92,7 +92,7 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 			{/* Silo container */}
 			<div className="relative">
 				{/* Top cone (hopper style) */}
-				<div className="w-12 sm:w-16 lg:w-20 h-3 sm:h-3.5 lg:h-4 relative">
+				<div className="w-10 sm:w-14 md:w-16 lg:w-20 h-2.5 sm:h-3 md:h-3.5 lg:h-4 relative">
 					<svg viewBox="0 0 80 16" className="w-full h-full">
 						<path d="M0,16 L40,0 L80,16 Z" fill={isRigActive ? "#1e293b" : "#0f172a"} stroke={isRigActive ? "#475569" : "#334155"} strokeWidth="1" />
 					</svg>
@@ -100,7 +100,7 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 
 				{/* Main silo body */}
 				<div className={cn(
-					"relative w-12 sm:w-16 lg:w-20 h-20 sm:h-24 lg:h-28 border-2 rounded-b-lg overflow-hidden",
+					"relative w-10 sm:w-14 md:w-16 lg:w-20 h-16 sm:h-20 md:h-24 lg:h-28 border-2 rounded-b-lg overflow-hidden",
 					!isRigActive ? "border-slate-700 bg-slate-900/30" :
 					hasBlocked ? "border-red-500 bg-red-950/30" :
 					isActive ? "border-blue-500 bg-blue-950/30" :
@@ -188,8 +188,8 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 
 			{/* Stats readout */}
 			<div className="mt-1 sm:mt-1.5 lg:mt-2 text-center">
-				<div className="font-mono text-sm sm:text-base font-bold text-slate-200">{total}</div>
-				<div className="flex gap-1 sm:gap-1.5 text-[7px] sm:text-[8px] lg:text-[9px] justify-center font-mono">
+				<div className="font-mono text-xs sm:text-sm md:text-base font-bold text-slate-200">{total}</div>
+				<div className="flex gap-0.5 sm:gap-1 md:gap-1.5 text-[6px] sm:text-[7px] md:text-[8px] lg:text-[9px] justify-center font-mono">
 					<span className="text-green-400">{pending}p</span>
 					<span className="text-blue-400">{inFlight}f</span>
 					<span className="text-red-400">{blocked}b</span>
@@ -988,12 +988,20 @@ export default function Overview() {
 								<Activity size={16} className="text-cyan-400" />
 								<span className="text-sm font-semibold text-slate-200">Message Queues</span>
 								<span className="text-xs text-slate-400">({status.rigs.length} rigs)</span>
+								{/* Responsive breakpoint indicator */}
+								<span className="ml-auto text-[10px] font-mono text-slate-500">
+									<span className="sm:hidden">XS</span>
+									<span className="hidden sm:inline md:hidden">SM</span>
+									<span className="hidden md:inline lg:hidden">MD</span>
+									<span className="hidden lg:inline xl:hidden">LG</span>
+									<span className="hidden xl:inline">XL</span>
+								</span>
 							</div>
 							<div className="overflow-y-auto flex-1">
 								{sortedRigs.length === 0 ? (
 									<div className="text-sm text-slate-500">No rigs configured</div>
 								) : (
-									<div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9 gap-2 sm:gap-3 lg:gap-4 justify-items-center">
+									<div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-9 gap-1.5 sm:gap-2 md:gap-3 lg:gap-4 justify-items-center">
 										{sortedRigs.map((rig: RigStatus) => (
 											<QueueLevel
 												key={rig.name}
