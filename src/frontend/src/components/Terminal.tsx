@@ -27,7 +27,6 @@ export function Terminal({
 	const wsRef = useRef<WebSocket | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
 	const [_connected, setConnected] = useState(false);
-	const isSelectingRef = useRef(false);
 
 	useEffect(() => {
 		if (!terminalRef.current) return;
@@ -122,49 +121,9 @@ export function Terminal({
 			});
 		};
 
-		// Track selection state to pause updates while user is selecting text
-		let pendingFrame: string | null = null;
-
-		const container = terminalRef.current;
-		const handleMouseDown = () => {
-			isSelectingRef.current = true;
-		};
-		const handleMouseUp = () => {
-			isSelectingRef.current = false;
-			// Apply any pending frame update after selection ends
-			if (pendingFrame !== null) {
-				term.write("\x1b[H\x1b[J");
-				term.write(pendingFrame);
-				pendingFrame = null;
-			}
-		};
-		container.addEventListener("mousedown", handleMouseDown);
-		document.addEventListener("mouseup", handleMouseUp);
-
+		// Handle incoming PTY data - write raw bytes directly to terminal
 		ws.onmessage = (event) => {
-			try {
-				const msg = JSON.parse(event.data);
-
-				if (msg.type === "scrollback") {
-					// Scrollback history only (not including visible area)
-					// Write to buffer without clearing
-					term.write(msg.data);
-				} else if (msg.type === "frame") {
-					// Pause frame updates while user is selecting text
-					if (isSelectingRef.current) {
-						pendingFrame = msg.data;
-						return;
-					}
-					// Visible pane update - overwrite in-place without destroying scrollback
-					// \x1b[H = cursor to home (top-left of viewport)
-					// \x1b[J = clear from cursor to end of screen (not scrollback!)
-					term.write("\x1b[H\x1b[J");
-					term.write(msg.data);
-				}
-			} catch {
-				// Raw data fallback
-				term.write(event.data);
-			}
+			term.write(event.data);
 		};
 
 		ws.onclose = () => {
@@ -254,8 +213,6 @@ export function Terminal({
 		return () => {
 			fitTimeouts.forEach(clearTimeout);
 			window.removeEventListener("resize", handleResize);
-			container.removeEventListener("mousedown", handleMouseDown);
-			document.removeEventListener("mouseup", handleMouseUp);
 			resizeObserver.disconnect();
 			ws.close();
 			term.dispose();
