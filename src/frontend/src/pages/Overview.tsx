@@ -77,26 +77,26 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
 	const hasBlocked = blocked > 0;
 
 	return (
-		<div className="flex flex-col items-center">
+		<div className="flex flex-col items-center flex-shrink-0">
 			<div className={cn(
-				"text-[9px] uppercase mb-1 font-bold tracking-wide",
+				"text-[10px] uppercase mb-2 font-bold tracking-wide text-center max-w-[80px] truncate",
 				hasBlocked ? "text-red-400" : isActive ? "text-blue-400" : "text-slate-500"
-			)}>
+			)} title={label}>
 				{label}
 			</div>
 
 			{/* Silo container */}
 			<div className="relative">
 				{/* Top cone (hopper style) */}
-				<div className="w-12 h-3 relative">
-					<svg viewBox="0 0 48 12" className="w-full h-full">
-						<path d="M0,12 L24,0 L48,12 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
+				<div className="w-20 h-4 relative">
+					<svg viewBox="0 0 80 16" className="w-full h-full">
+						<path d="M0,16 L40,0 L80,16 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
 					</svg>
 				</div>
 
 				{/* Main silo body */}
 				<div className={cn(
-					"relative w-12 h-20 border-2 rounded-b-lg overflow-hidden",
+					"relative w-20 h-28 border-2 rounded-b-lg overflow-hidden",
 					hasBlocked ? "border-red-500 bg-red-950/30" :
 					isActive ? "border-blue-500 bg-blue-950/30" :
 					"border-slate-600 bg-slate-900/50"
@@ -164,7 +164,7 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
 							className="absolute left-0 right-0 border-t border-slate-500/30"
 							style={{ bottom: `${level}%` }}
 						>
-							<span className="absolute right-0 -top-1.5 text-[6px] text-slate-600">{level}%</span>
+							<span className="absolute right-0.5 -top-1.5 text-[7px] text-slate-500 font-mono">{level}%</span>
 						</div>
 					))}
 
@@ -182,9 +182,9 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label }: {
 			</div>
 
 			{/* Stats readout */}
-			<div className="mt-1 text-center">
-				<div className="font-mono text-sm font-bold text-slate-200">{total}</div>
-				<div className="flex gap-1 text-[7px] justify-center">
+			<div className="mt-2 text-center">
+				<div className="font-mono text-base font-bold text-slate-200">{total}</div>
+				<div className="flex gap-1.5 text-[9px] justify-center font-mono">
 					<span className="text-green-400">{pending}p</span>
 					<span className="text-blue-400">{inFlight}f</span>
 					<span className="text-red-400">{blocked}b</span>
@@ -959,24 +959,27 @@ export default function Overview() {
 						<WorkPipeline beads={beads} />
 
 						{/* Queue levels */}
-						<div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4 flex-1">
+						<div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4 flex-1 overflow-hidden flex flex-col">
 							<div className="flex items-center gap-2 mb-4">
 								<Activity size={16} className="text-cyan-400" />
 								<span className="text-sm font-semibold text-slate-200">Message Queues</span>
+								<span className="text-xs text-slate-400">({status.rigs.length} rigs)</span>
 							</div>
-							<div className="flex justify-around items-end h-32">
+							<div className="overflow-y-auto flex-1">
 								{status.rigs.length === 0 ? (
 									<div className="text-sm text-slate-500">No rigs configured</div>
 								) : (
-									status.rigs.map((rig: RigStatus) => (
-										<QueueLevel
-											key={rig.name}
-											label={rig.name.slice(0, 8)}
-											pending={rig.mq?.pending || 0}
-											inFlight={rig.mq?.in_flight || 0}
-											blocked={rig.mq?.blocked || 0}
-										/>
-									))
+									<div className="grid grid-cols-9 gap-4 justify-items-center">
+										{status.rigs.map((rig: RigStatus) => (
+											<QueueLevel
+												key={rig.name}
+												label={rig.name.slice(0, 12)}
+												pending={rig.mq?.pending || 0}
+												inFlight={rig.mq?.in_flight || 0}
+												blocked={rig.mq?.blocked || 0}
+											/>
+										))}
+									</div>
 								)}
 							</div>
 						</div>
