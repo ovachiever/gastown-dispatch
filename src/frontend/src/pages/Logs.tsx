@@ -1,33 +1,32 @@
-import { useState, useEffect, useRef } from "react";
-import { Download, Search, ScrollText, Wifi, WifiOff } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Download, Search, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface LogEntry {
-	timestamp: string;
-	source: string;
-	level: "info" | "warn" | "error" | "debug";
-	message: string;
-	data?: Record<string, unknown>;
-}
-
-type LogSource =
-	| "all"
-	| "deacon"
-	| "mayor"
-	| "witness"
-	| "refinery"
-	| "polecat"
-	| "system";
+import { getStatus } from "@/lib/api";
+import { LogSourceTree } from "@/components/logs/LogSourceTree";
+import { LogViewer, type LogEntryData } from "@/components/logs";
 
 export default function Logs() {
-	const [source, setSource] = useState<LogSource>("all");
+	const [selectedSources, setSelectedSources] = useState<Set<string>>(
+		new Set(["all"]),
+	);
 	const [search, setSearch] = useState("");
-	const [logs, setLogs] = useState<LogEntry[]>([]);
+	const [logs, setLogs] = useState<LogEntryData[]>([]);
 	const [connected, setConnected] = useState(false);
 	const [autoScroll, setAutoScroll] = useState(true);
-	const logContainerRef = useRef<HTMLDivElement>(null);
 	const eventSourceRef = useRef<EventSource | null>(null);
+	const logIdCounter = useRef(0);
 
+	// Fetch status to get rig list
+	const { data: statusResponse } = useQuery({
+		queryKey: ["status"],
+		queryFn: getStatus,
+		refetchInterval: 30_000,
+	});
+
+	const rigs = statusResponse?.status?.rigs?.map((r) => r.name) || [];
+
+	// Connect to log stream
 	useEffect(() => {
 		const eventSource = new EventSource("/api/stream/logs");
 		eventSourceRef.current = eventSource;
@@ -38,8 +37,16 @@ export default function Logs() {
 		});
 
 		eventSource.addEventListener("log", (e) => {
-			const entry = JSON.parse(e.data) as LogEntry;
-			setLogs((prev) => [...prev.slice(-499), entry]); // Keep last 500
+			const rawEntry = JSON.parse(e.data);
+			const entry: LogEntryData = {
+				id: `log-${++logIdCounter.current}`,
+				timestamp: rawEntry.timestamp,
+				source: rawEntry.source,
+				level: rawEntry.level || "info",
+				message: rawEntry.message,
+				data: rawEntry.data,
+			};
+			setLogs((prev) => [...prev.slice(-999), entry]); // Keep last 1000
 		});
 
 		eventSource.addEventListener("status", (e) => {
@@ -56,28 +63,95 @@ export default function Logs() {
 		};
 	}, []);
 
-	// Auto-scroll to bottom
-	useEffect(() => {
-		if (autoScroll && logContainerRef.current) {
-			logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-		}
-	}, [logs, autoScroll]);
+	// Handle source selection with multi-select support
+	const handleSourceSelect = useCallback(
+		(sourceId: string, multiSelect: boolean) => {
+			setSelectedSources((prev) => {
+				const next = new Set(prev);
 
+				if (sourceId === "all") {
+					// Selecting "all" clears other selections
+					return new Set(["all"]);
+				}
+
+				if (multiSelect) {
+					// Multi-select: toggle the source
+					next.delete("all");
+					if (next.has(sourceId)) {
+						next.delete(sourceId);
+						if (next.size === 0) {
+							return new Set(["all"]);
+						}
+					} else {
+						next.add(sourceId);
+					}
+				} else {
+					// Single select: replace selection
+					return new Set([sourceId]);
+				}
+
+				return next;
+			});
+		},
+		[],
+	);
+
+	// Filter logs based on selected sources and search
 	const filteredLogs = logs.filter((log) => {
-		const matchesSource =
-			source === "all" || log.source.toLowerCase().includes(source);
-		const matchesSearch =
-			!search ||
-			log.message.toLowerCase().includes(search.toLowerCase()) ||
-			log.source.toLowerCase().includes(search.toLowerCase());
-		return matchesSource && matchesSearch;
+		// Source filter
+		if (!selectedSources.has("all")) {
+			const matchesSource = Array.from(selectedSources).some((source) => {
+				const lowerSource = log.source.toLowerCase();
+
+				// Match exact source patterns
+				if (source === "system/daemon" && lowerSource === "daemon")
+					return true;
+				if (source === "system/gt-log" && lowerSource.includes("gt-log"))
+					return true;
+				if (source === "global/mayor" && lowerSource.includes("mayor"))
+					return true;
+				if (source === "global/deacon" && lowerSource.includes("deacon"))
+					return true;
+				if (source.startsWith("rig/")) {
+					const parts = source.split("/");
+					const rigName = parts[1];
+					const agentType = parts[2]; // witness, refinery, or polecat
+					if (agentType === "witness" && lowerSource.includes("witness"))
+						return true;
+					if (agentType === "refinery" && lowerSource.includes("refinery"))
+						return true;
+					if (agentType?.startsWith("polecat") && lowerSource.includes("polecat"))
+						return true;
+					// Match rig name in source
+					if (lowerSource.includes(rigName?.toLowerCase() || "")) return true;
+				}
+
+				return false;
+			});
+
+			if (!matchesSource) return false;
+		}
+
+		// Search filter
+		if (search) {
+			const searchLower = search.toLowerCase();
+			return (
+				log.message.toLowerCase().includes(searchLower) ||
+				log.source.toLowerCase().includes(searchLower)
+			);
+		}
+
+		return true;
 	});
 
 	const clearLogs = () => setLogs([]);
 
 	const downloadLogs = () => {
 		const content = filteredLogs
-			.map((l) => `[${l.timestamp}] [${l.source}] [${l.level}] ${l.message}`)
+			.map(
+				(l) =>
+					`[${l.timestamp}] [${l.source}] [${l.level}] ${l.message}${l.data ? ` ${JSON.stringify(l.data)}` : ""}`,
+			)
 			.join("\n");
 		const blob = new Blob([content], { type: "text/plain" });
 		const url = URL.createObjectURL(blob);
@@ -88,23 +162,10 @@ export default function Logs() {
 		URL.revokeObjectURL(url);
 	};
 
-	const getLevelColor = (level: string) => {
-		switch (level) {
-			case "error":
-				return "text-red-400";
-			case "warn":
-				return "text-yellow-400";
-			case "debug":
-				return "text-gray-400";
-			default:
-				return "text-gt-text";
-		}
-	};
-
 	return (
-		<div className="flex flex-col h-screen">
+		<div className="h-screen flex flex-col">
 			{/* Header */}
-			<div className="p-4 border-b border-gt-border">
+			<div className="p-4 border-b border-gt-border bg-gt-bg">
 				<div className="flex items-center justify-between mb-4">
 					<div className="flex items-center gap-3">
 						<div>
@@ -155,86 +216,42 @@ export default function Logs() {
 					</div>
 				</div>
 
-				{/* Source selector */}
-				<div className="flex items-center gap-4">
-					<div className="flex bg-gt-surface border border-gt-border rounded-lg overflow-hidden">
-						{(
-							[
-								"all",
-								"deacon",
-								"mayor",
-								"witness",
-								"refinery",
-								"polecat",
-								"system",
-							] as LogSource[]
-						).map((s) => (
-							<button
-								key={s}
-								onClick={() => setSource(s)}
-								className={cn(
-									"px-3 py-1.5 text-sm capitalize transition-colors",
-									source === s
-										? "bg-gt-accent text-black"
-										: "hover:bg-gt-border",
-								)}
-							>
-								{s}
-							</button>
-						))}
-					</div>
-
-					<div className="flex-1 relative">
-						<Search
-							className="absolute left-3 top-1/2 -translate-y-1/2 text-gt-muted"
-							size={16}
-						/>
-						<input
-							type="text"
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Filter logs..."
-							className="w-full bg-gt-surface border border-gt-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-gt-accent"
-						/>
-					</div>
+				{/* Search bar */}
+				<div className="relative">
+					<Search
+						className="absolute left-3 top-1/2 -translate-y-1/2 text-gt-muted"
+						size={16}
+					/>
+					<input
+						type="text"
+						value={search}
+						onChange={(e) => setSearch(e.target.value)}
+						placeholder="Filter logs..."
+						className="w-full bg-gt-surface border border-gt-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-gt-accent"
+					/>
 				</div>
 			</div>
 
-			{/* Log content */}
-			<div
-				ref={logContainerRef}
-				className="flex-1 overflow-auto p-4 font-mono text-sm bg-gt-bg"
-			>
-				{filteredLogs.length === 0 ? (
-					<div className="h-full flex items-center justify-center">
-						<div className="text-center">
-							<ScrollText className="mx-auto text-gt-muted mb-4" size={48} />
-							<p className="text-gt-muted mb-2">
-								{connected ? "Waiting for logs..." : "No logs available"}
-							</p>
-							<p className="text-sm text-gt-muted">
-								{connected
-									? "Logs will appear here as they stream in."
-									: "Connect to a Gas Town workspace to see logs."}
-							</p>
-						</div>
-					</div>
-				) : (
-					<div className="space-y-0.5">
-						{filteredLogs.map((log, i) => (
-							<div
-								key={`${log.timestamp}-${i}`}
-								className={cn("py-0.5 flex gap-2", getLevelColor(log.level))}
-							>
-								<span className="text-gt-muted shrink-0">
-									{new Date(log.timestamp).toLocaleTimeString()}
-								</span>
-								<span className="text-gt-accent shrink-0">[{log.source}]</span>
-								<span className="break-all">{log.message}</span>
-							</div>
-						))}
-					</div>
-				)}
+			{/* Master-Detail Layout */}
+			<div className="flex-1 flex overflow-hidden">
+				{/* Source Tree (Left Panel - 240px) */}
+				<div className="w-60 shrink-0">
+					<LogSourceTree
+						rigs={rigs}
+						selectedSources={selectedSources}
+						onSourceSelect={handleSourceSelect}
+					/>
+				</div>
+
+				{/* Log Viewer (Right Panel - Flex) */}
+				<div className="flex-1 overflow-hidden">
+					<LogViewer
+						logs={filteredLogs}
+						autoScroll={autoScroll}
+						onAutoScrollChange={setAutoScroll}
+						connected={connected}
+					/>
+				</div>
 			</div>
 		</div>
 	);
