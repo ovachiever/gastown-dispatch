@@ -52,6 +52,11 @@ import {
 	markMailUnread,
 	archiveMail,
 } from "../services/mail.js";
+import {
+	detectReworkLoops,
+	getFailedMergeRequests,
+	getAllMergeRequests,
+} from "../services/analytics.js";
 import type {
 	ConvoyCreateRequest,
 	ConvoyCloseRequest,
@@ -552,6 +557,34 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const result = await archiveMail(req.params.id, getTownRoot(req));
 		res.json(result);
+	}),
+);
+
+// =====================
+// Analytics
+// =====================
+
+router.get(
+	"/analytics/rework-loops",
+	asyncHandler(async (req, res) => {
+		const summary = await detectReworkLoops(getTownRoot(req));
+		res.json(summary);
+	}),
+);
+
+router.get(
+	"/analytics/merge-requests",
+	asyncHandler(async (req, res) => {
+		const mrs = await getAllMergeRequests(getTownRoot(req));
+		res.json(mrs);
+	}),
+);
+
+router.get(
+	"/analytics/merge-requests/failed",
+	asyncHandler(async (req, res) => {
+		const mrs = await getFailedMergeRequests(getTownRoot(req));
+		res.json(mrs);
 	}),
 );
 

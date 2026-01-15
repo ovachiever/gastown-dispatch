@@ -282,3 +282,40 @@ export interface DispatchSession {
 	created_at: string;
 	updated_at: string;
 }
+
+// Rework Loop Detection Types
+export type MRStatus = "pending" | "in_flight" | "merged" | "failed" | "rejected";
+
+export interface MergeRequest {
+	id: string;
+	rig: string;
+	branch: string;
+	issue_id: string;
+	issue_title?: string;
+	status: MRStatus;
+	created_at: string;
+	updated_at?: string;
+	error?: string;
+	retry_count: number;
+}
+
+export interface ReworkLoop {
+	issue_id: string;
+	issue_title: string;
+	rig: string;
+	cycle_count: number;           // Number of MERGE_FAILED → retry cycles
+	time_stuck_ms: number;         // Total time in rework loop
+	time_stuck_display: string;    // Human-readable "2h 15m"
+	first_failure_at: string;      // When the loop started
+	last_failure_at: string;       // Most recent failure
+	current_status: MRStatus;
+	assignee?: string;
+	mr_id?: string;
+}
+
+export interface ReworkLoopSummary {
+	total_loops: number;
+	total_time_stuck_ms: number;
+	loops: ReworkLoop[];
+	worst_offenders: ReworkLoop[]; // Top 5 by cycle count or time stuck
+}

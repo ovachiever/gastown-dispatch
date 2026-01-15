@@ -13,11 +13,13 @@ import {
 	Package,
 	Truck,
 	Radio,
+	RotateCcw,
+	Clock,
 } from "lucide-react";
-import { getStatus, getConvoys, getBeads, startTown, shutdownTown } from "@/lib/api";
+import { getStatus, getConvoys, getBeads, startTown, shutdownTown, getReworkLoops } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo } from "react";
-import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
+import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead, ReworkLoopSummary } from "@/types/api";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -546,6 +548,90 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 	);
 }
 
+// Rework Loops Panel - shows issues stuck in merge failure cycles
+function ReworkLoopsPanel({ loops }: { loops: ReworkLoopSummary | undefined }) {
+	if (!loops || loops.total_loops === 0) {
+		return (
+			<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
+				<div className="flex items-center gap-2 mb-2">
+					<RotateCcw size={16} className="text-slate-400" />
+					<span className="text-sm font-semibold text-slate-200">Rework Loops</span>
+				</div>
+				<div className="text-xs text-slate-500 text-center py-2">
+					No rework loops detected
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="bg-slate-900/80 border border-orange-700 rounded-lg p-3">
+			<div className="flex items-center justify-between mb-3">
+				<div className="flex items-center gap-2">
+					<RotateCcw size={16} className="text-orange-400 animate-spin-slow" />
+					<span className="text-sm font-semibold text-slate-200">Rework Loops</span>
+				</div>
+				<span className="text-xs px-2 py-0.5 bg-orange-900 text-orange-300 rounded-full font-mono">
+					{loops.total_loops} STUCK
+				</span>
+			</div>
+
+			<div className="max-h-40 overflow-y-auto space-y-2">
+				{loops.worst_offenders.map((loop) => (
+					<div
+						key={loop.issue_id}
+						className={cn(
+							"text-xs p-2 rounded border",
+							loop.cycle_count >= 3
+								? "bg-red-900/30 border-red-700 text-red-200"
+								: loop.cycle_count >= 2
+									? "bg-orange-900/30 border-orange-700 text-orange-200"
+									: "bg-yellow-900/30 border-yellow-700 text-yellow-200"
+						)}
+					>
+						<div className="flex items-center justify-between mb-1">
+							<span className="font-mono font-bold truncate max-w-[100px]" title={loop.issue_id}>
+								{loop.issue_id}
+							</span>
+							<div className="flex items-center gap-2">
+								<span className="flex items-center gap-1" title="Retry cycles">
+									<RotateCcw size={10} />
+									{loop.cycle_count}×
+								</span>
+								<span className="flex items-center gap-1" title="Time stuck">
+									<Clock size={10} />
+									{loop.time_stuck_display}
+								</span>
+							</div>
+						</div>
+						<div className="text-[10px] text-slate-400 truncate" title={loop.issue_title}>
+							{loop.issue_title}
+						</div>
+						<div className="flex items-center justify-between mt-1 text-[10px]">
+							<span className="text-slate-500">{loop.rig}</span>
+							<span className={cn(
+								"px-1 rounded uppercase",
+								loop.current_status === "failed" ? "bg-red-900 text-red-300" :
+								loop.current_status === "rejected" ? "bg-purple-900 text-purple-300" :
+								loop.current_status === "in_flight" ? "bg-blue-900 text-blue-300" :
+								"bg-slate-800 text-slate-400"
+							)}>
+								{loop.current_status}
+							</span>
+						</div>
+					</div>
+				))}
+			</div>
+
+			{loops.total_loops > 5 && (
+				<div className="text-[10px] text-slate-500 text-center mt-2">
+					+{loops.total_loops - 5} more issues in rework loops
+				</div>
+			)}
+		</div>
+	);
+}
+
 // Main control panel header
 function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, isFetching }: {
 	status?: TownStatus;
@@ -835,6 +921,13 @@ export default function Overview() {
 		retry: 1,
 	});
 
+	const { data: reworkLoops } = useQuery({
+		queryKey: ["rework-loops"],
+		queryFn: getReworkLoops,
+		refetchInterval: 15_000,
+		retry: 1,
+	});
+
 	const handleStart = async () => {
 		await startTown();
 		refetchStatus();
@@ -930,9 +1023,11 @@ export default function Overview() {
 			{/* Main dashboard area */}
 			<div className="flex-1 p-4 overflow-hidden">
 				<div className="h-full grid grid-cols-12 gap-4">
-					{/* Left panel - Alarms and Convoys */}
+					{/* Left panel - Alarms, Rework Loops, and Convoys */}
 					<div className="col-span-3 flex flex-col gap-4">
 						<AlarmPanel agents={status.agents} rigs={status.rigs} />
+
+						<ReworkLoopsPanel loops={reworkLoops} />
 
 						{/* Convoy batch monitor */}
 						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden">

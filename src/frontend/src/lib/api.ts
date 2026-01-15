@@ -260,3 +260,18 @@ export async function nudge(agent: string, message: string): Promise<ActionResul
 		body: JSON.stringify({ agent, message }),
 	});
 }
+
+// Analytics
+import type { ReworkLoopSummary, MergeRequest } from "@/types/api";
+
+export async function getReworkLoops(): Promise<ReworkLoopSummary> {
+	return fetchJson<ReworkLoopSummary>("/analytics/rework-loops");
+}
+
+export async function getAllMergeRequests(): Promise<MergeRequest[]> {
+	return fetchJson<MergeRequest[]>("/analytics/merge-requests");
+}
+
+export async function getFailedMergeRequests(): Promise<MergeRequest[]> {
+	return fetchJson<MergeRequest[]>("/analytics/merge-requests/failed");
+}
