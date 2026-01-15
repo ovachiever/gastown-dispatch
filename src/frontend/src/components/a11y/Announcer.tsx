@@ -44,30 +44,7 @@ export const Announcer = ({
   const [message, setMessage] = useState('');
   const timeoutRef = useRef<number | null>(null);
 
-  const announce = (text: string) => {
-    // Clear any pending timeout
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-    }
-
-    // Set the message
-    setMessage(text);
-
-    // Auto-clear after delay
-    if (clearDelay > 0) {
-      timeoutRef.current = window.setTimeout(() => {
-        setMessage('');
-      }, clearDelay);
-    }
-  };
-
-  const clear = () => {
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-    }
-    setMessage('');
-  };
-
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -75,6 +52,11 @@ export const Announcer = ({
       }
     };
   }, []);
+
+  // Note: announce() and clear() methods are available through useAnnouncer hook
+  // This component only renders the ARIA live region
+  // These variables are available for future imperative API integration
+  void [timeoutRef, clearDelay, setMessage];
 
   return (
     <div

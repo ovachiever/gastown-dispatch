@@ -12,11 +12,9 @@ import {
   User,
   Tag,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   Pause,
   Play,
-  Trash2,
   Edit,
 } from "lucide-react";
 import {
