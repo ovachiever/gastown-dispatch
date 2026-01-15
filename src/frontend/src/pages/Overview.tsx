@@ -595,7 +595,9 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 				<div className="flex items-center gap-4">
 					<div className="flex items-center gap-1 text-sm">
 						<Server size={14} className="text-blue-400" />
-						<span className="font-mono text-slate-300">{status?.summary.rig_count || 0}</span>
+						<span className="font-mono text-slate-300">
+							{status?.rigs?.filter(r => r.agents?.some(a => a.running)).length || 0}/{status?.summary.rig_count || 0}
+						</span>
 						<span className="text-slate-500 text-xs">RIGS</span>
 					</div>
 					<div className="flex items-center gap-1 text-sm">
