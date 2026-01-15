@@ -41,7 +41,7 @@ function getCache(townRoot?: string): Cache<TownStatus> {
 			async () => {
 				const status = await runGtJson<TownStatus>(["status"], {
 					cwd: townRoot,
-					timeout: 60_000, // Increase timeout to 60s for large workspaces
+					timeout: 120_000, // Increase timeout to 120s for large workspaces (25+ rigs)
 				});
 				return status;
 			},
