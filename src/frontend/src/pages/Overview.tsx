@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
 import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsSparklines";
+import { MayorDispatchOverlay } from "@/components/MayorDispatchOverlay";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -659,6 +660,7 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 
 // Industrial control room visualization
 function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
+	const [showMayorOverlay, setShowMayorOverlay] = useState(false);
 	const mayor = agents.find(a => a.name === "mayor");
 	const deacon = agents.find(a => a.name === "deacon");
 
@@ -695,10 +697,15 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 			</div>
 
 			<div className="flex items-center justify-between gap-2">
-				{/* Mayor - Command Center */}
-				<div className="flex flex-col items-center flex-shrink-0">
+				{/* Mayor - Command Center (clickable) */}
+				<button
+					onClick={() => setShowMayorOverlay(true)}
+					className="flex flex-col items-center flex-shrink-0 group cursor-pointer"
+					title="Click to open Mayor dispatch controls"
+				>
 					<div className={cn(
-						"relative w-16 h-16 rounded-lg border-2 flex items-center justify-center overflow-hidden",
+						"relative w-16 h-16 rounded-lg border-2 flex items-center justify-center overflow-hidden transition-all",
+						"group-hover:ring-2 group-hover:ring-purple-400/50 group-hover:scale-105",
 						getMayorStatus() === "active" ? "border-green-500 bg-gradient-to-b from-green-900/50 to-green-950/80" :
 						getMayorStatus() === "processing" ? "border-blue-500 bg-gradient-to-b from-blue-900/50 to-blue-950/80" :
 						getMayorStatus() === "idle" ? "border-yellow-500 bg-gradient-to-b from-yellow-900/50 to-yellow-950/80" :
@@ -723,7 +730,7 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 							{mayor.work_title}
 						</div>
 					)}
-				</div>
+				</button>
 
 				{/* Connection - Communication Link */}
 				<div className="flex-1 relative h-6 min-w-8">
@@ -803,6 +810,11 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 					</div>
 				</div>
 			</div>
+
+			{/* Mayor Dispatch Overlay */}
+			{showMayorOverlay && (
+				<MayorDispatchOverlay onClose={() => setShowMayorOverlay(false)} />
+			)}
 		</div>
 	);
 }
