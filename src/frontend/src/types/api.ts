@@ -134,7 +134,15 @@ export interface Bead {
 	title: string;
 	description?: string;
 	status: "open" | "in_progress" | "hooked" | "closed";
-	type: "bug" | "feature" | "task" | "epic" | "chore" | "convoy" | "agent";
+	type:
+		| "bug"
+		| "feature"
+		| "task"
+		| "epic"
+		| "chore"
+		| "convoy"
+		| "agent"
+		| "merge-request";
 	priority: number;
 	assignee?: string;
 	labels?: string[];
@@ -142,6 +150,11 @@ export interface Bead {
 	created_at: string;
 	updated_at?: string;
 	created_by?: string;
+	// MR-related fields
+	source_branch?: string;
+	target_branch?: string;
+	linked_issue?: string;
+	commits?: string[];
 }
 
 export interface ActionResult {
@@ -195,4 +208,42 @@ export interface NextMergeRequest {
 	rig: string;
 	request: MergeRequest | null;
 	strategy: "priority" | "fifo";
+}
+
+// Mail types
+export type MailPriority = "urgent" | "high" | "normal" | "low" | "backlog";
+export type MailType =
+	| "action"
+	| "notification"
+	| "alert"
+	| "info"
+	| "task"
+	| "scavenge"
+	| "reply";
+
+export interface MailMessage {
+	id: string;
+	from: string;
+	to: string;
+	subject: string;
+	body?: string;
+	timestamp: string;
+	read: boolean;
+	archived?: boolean;
+	thread_id?: string;
+	priority?: MailPriority;
+	type?: MailType;
+}
+
+export interface MailInbox {
+	messages: MailMessage[];
+	unread_count: number;
+	total_count: number;
+}
+
+export interface MailInboxFilters {
+	unread?: boolean;
+	archived?: boolean;
+	priority?: MailPriority;
+	type?: MailType;
 }

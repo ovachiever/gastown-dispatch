@@ -91,7 +91,7 @@ function determineOperationalMode(
 	patrolPaused: PatrolPausedState | null,
 ): "normal" | "degraded" | "offline" {
 	// If boot indicates degraded mode, use that
-	if (bootStatus?.degraded) {
+	if (bootStatus === "degraded") {
 		return "degraded";
 	}
 
@@ -102,8 +102,7 @@ function determineOperationalMode(
 
 	// If we have a recent heartbeat, we're normal
 	if (heartbeat?.timestamp) {
-		const heartbeatAge =
-			Date.now() - new Date(heartbeat.timestamp).getTime();
+		const heartbeatAge = Date.now() - new Date(heartbeat.timestamp).getTime();
 		// If heartbeat is older than 10 minutes, consider degraded
 		if (heartbeatAge > 10 * 60 * 1000) {
 			return "degraded";
@@ -121,14 +120,12 @@ function determineOperationalMode(
 export async function getPatrolStatus(
 	townRoot?: string,
 ): Promise<PatrolStatus> {
-	const [heartbeat, deaconState, bootStatus, patrolPaused] = await Promise.all(
-		[
-			getDeaconHeartbeat(townRoot),
-			getDeaconState(townRoot),
-			getBootStatus(townRoot),
-			getPatrolPausedState(townRoot),
-		],
-	);
+	const [heartbeat, deaconState, bootStatus, patrolPaused] = await Promise.all([
+		getDeaconHeartbeat(townRoot),
+		getDeaconState(townRoot),
+		getBootStatus(townRoot),
+		getPatrolPausedState(townRoot),
+	]);
 
 	const operationalMode = determineOperationalMode(
 		bootStatus,
@@ -142,7 +139,7 @@ export async function getPatrolStatus(
 		deacon_state: deaconState,
 		patrol_muted: patrolPaused?.paused ?? false,
 		patrol_paused: patrolPaused,
-		degraded_mode: bootStatus?.degraded ?? false,
+		degraded_mode: bootStatus === "degraded",
 		operational_mode: operationalMode,
 	};
 }

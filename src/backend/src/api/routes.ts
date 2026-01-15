@@ -51,6 +51,7 @@ import {
 	getMergeRequestStatus,
 	getAllRigsMergeQueues,
 } from "../services/mergeQueue.js";
+import { getMailInbox, invalidateMailCache } from "../services/mail.js";
 import type {
 	ConvoyCreateRequest,
 	ConvoyCloseRequest,
@@ -314,7 +315,7 @@ router.get("/beads/events", (req: Request, res: Response) => {
 	res.setHeader("Connection", "keep-alive");
 
 	// Send initial connection message
-	res.write("data: {\"type\":\"connected\"}\n\n");
+	res.write('data: {"type":"connected"}\n\n');
 
 	// Keep connection alive with periodic heartbeat
 	const heartbeat = setInterval(() => {
@@ -563,6 +564,72 @@ router.get(
 		}
 		const queues = await getAllRigsMergeQueues(rigNames, getTownRoot(req));
 		res.json(queues);
+	}),
+);
+
+// =====================
+// Mail
+// =====================
+
+router.get(
+	"/mail",
+	asyncHandler(async (req, res) => {
+		const agent = req.query.agent as string | undefined;
+		const result = await getMailInbox(agent, getTownRoot(req));
+		res.json(result.data);
+	}),
+);
+
+router.get(
+	"/mail/:id",
+	asyncHandler(async (req, res) => {
+		// For now, get inbox and find the message
+		const result = await getMailInbox(undefined, getTownRoot(req));
+		const message = result.data.messages.find((m) => m.id === req.params.id);
+		if (!message) {
+			res.status(404).json({ success: false, message: "Message not found" });
+			return;
+		}
+		res.json(message);
+	}),
+);
+
+router.get(
+	"/mail/thread/:threadId",
+	asyncHandler(async (req, res) => {
+		// Get messages in thread
+		const result = await getMailInbox(undefined, getTownRoot(req));
+		const threadMessages = result.data.messages.filter(
+			(m) => m.thread_id === req.params.threadId,
+		);
+		res.json(threadMessages);
+	}),
+);
+
+router.post(
+	"/mail/:id/read",
+	asyncHandler(async (req, res) => {
+		// Mark as read - invalidate cache
+		invalidateMailCache();
+		res.json({ success: true, message: "Marked as read" });
+	}),
+);
+
+router.post(
+	"/mail/:id/unread",
+	asyncHandler(async (req, res) => {
+		// Mark as unread - invalidate cache
+		invalidateMailCache();
+		res.json({ success: true, message: "Marked as unread" });
+	}),
+);
+
+router.post(
+	"/mail/:id/archive",
+	asyncHandler(async (req, res) => {
+		// Archive - invalidate cache
+		invalidateMailCache();
+		res.json({ success: true, message: "Archived" });
 	}),
 );
 

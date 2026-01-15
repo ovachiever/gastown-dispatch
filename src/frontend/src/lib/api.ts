@@ -9,6 +9,9 @@ import type {
 	BeadFilters,
 	MergeQueueListResponse,
 	NextMergeRequest,
+	MailMessage,
+	MailInbox,
+	MailInboxFilters,
 } from "@/types/api";
 
 const API_BASE = "/api";
@@ -256,7 +259,10 @@ export async function nukePolecat(
 	);
 }
 
-export async function nudge(agent: string, message: string): Promise<ActionResult> {
+export async function nudge(
+	agent: string,
+	message: string,
+): Promise<ActionResult> {
 	return fetchJson<ActionResult>("/actions/nudge", {
 		method: "POST",
 		body: JSON.stringify({ agent, message }),
@@ -301,4 +307,46 @@ export async function getAllMergeQueues(
 	return fetchJson<Record<string, MergeQueueListResponse>>(
 		`/mq?rigs=${rigs.map(encodeURIComponent).join(",")}`,
 	);
+}
+
+// Mail
+export async function getMailInbox(
+	filters?: MailInboxFilters,
+): Promise<MailInbox> {
+	const params = new URLSearchParams();
+	if (filters?.unread) params.set("unread", "true");
+	if (filters?.archived) params.set("archived", "true");
+	if (filters?.priority) params.set("priority", filters.priority);
+	if (filters?.type) params.set("type", filters.type);
+
+	const query = params.toString();
+	return fetchJson<MailInbox>(`/mail${query ? `?${query}` : ""}`);
+}
+
+export async function getMailMessage(id: string): Promise<MailMessage> {
+	return fetchJson<MailMessage>(`/mail/${encodeURIComponent(id)}`);
+}
+
+export async function getMailThread(threadId: string): Promise<MailMessage[]> {
+	return fetchJson<MailMessage[]>(
+		`/mail/thread/${encodeURIComponent(threadId)}`,
+	);
+}
+
+export async function markMailRead(id: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/mail/${encodeURIComponent(id)}/read`, {
+		method: "POST",
+	});
+}
+
+export async function markMailUnread(id: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/mail/${encodeURIComponent(id)}/unread`, {
+		method: "POST",
+	});
+}
+
+export async function archiveMail(id: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/mail/${encodeURIComponent(id)}/archive`, {
+		method: "POST",
+	});
 }

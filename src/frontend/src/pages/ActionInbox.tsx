@@ -29,7 +29,8 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import type { MailMessage, MailPriority, MailType } from "@/types/api";
 
 // Priority badge component
-function PriorityBadge({ priority }: { priority: MailPriority }) {
+function PriorityBadge({ priority }: { priority?: MailPriority }) {
+	if (!priority) return null;
 	const config: Record<
 		MailPriority,
 		{ label: string; className: string; icon: typeof AlertTriangle }
@@ -77,7 +78,7 @@ function PriorityBadge({ priority }: { priority: MailPriority }) {
 }
 
 // Mail type icon
-function MailTypeIcon({ type }: { type: MailType }) {
+function MailTypeIcon({ type }: { type?: MailType }) {
 	switch (type) {
 		case "task":
 			return <Zap size={14} className="text-amber-400" />;
@@ -180,7 +181,7 @@ function MessageDetail({
 
 	const { data: thread } = useQuery({
 		queryKey: ["mail", "thread", message?.thread_id],
-		queryFn: () => getMailThread(message!.thread_id),
+		queryFn: () => getMailThread(message!.thread_id!),
 		enabled: !!message?.thread_id,
 	});
 
@@ -301,9 +302,7 @@ function MessageDetail({
 			{/* Body */}
 			<div className="flex-1 overflow-auto p-4">
 				<div className="prose prose-invert prose-sm max-w-none">
-					<div className="whitespace-pre-wrap text-gt-text">
-						{message.body}
-					</div>
+					<div className="whitespace-pre-wrap text-gt-text">{message.body}</div>
 				</div>
 
 				{/* Thread history */}
@@ -358,10 +357,12 @@ function EmptyState({ filter }: { filter: string }) {
 // Main component
 export default function ActionInbox() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [filter, setFilter] = useState<"all" | "actionable" | "unread">("actionable");
+	const [filter, setFilter] = useState<"all" | "actionable" | "unread">(
+		"actionable",
+	);
 
 	const {
-		data: messages,
+		data: inbox,
 		isLoading,
 		refetch,
 		isRefetching,
@@ -372,8 +373,10 @@ export default function ActionInbox() {
 		refetchInterval: 30000, // Poll every 30 seconds
 	});
 
+	const messages = inbox?.messages;
+
 	// Filter messages based on selected filter
-	const filteredMessages = messages?.filter((m) => {
+	const filteredMessages = messages?.filter((m: MailMessage) => {
 		if (filter === "actionable") {
 			// Show only actionable types (task, scavenge) or escalations (urgent, high priority)
 			return (
@@ -386,10 +389,10 @@ export default function ActionInbox() {
 		return true;
 	});
 
-	const unreadCount = messages?.filter((m) => !m.read).length ?? 0;
+	const unreadCount = messages?.filter((m: MailMessage) => !m.read).length ?? 0;
 	const actionableCount =
 		messages?.filter(
-			(m) =>
+			(m: MailMessage) =>
 				m.type === "task" ||
 				m.type === "scavenge" ||
 				m.priority === "urgent" ||
@@ -471,7 +474,7 @@ export default function ActionInbox() {
 							<Loader2 className="animate-spin text-gt-muted" size={24} />
 						</div>
 					) : filteredMessages && filteredMessages.length > 0 ? (
-						filteredMessages.map((message) => (
+						filteredMessages.map((message: MailMessage) => (
 							<MailCard
 								key={message.id}
 								message={message}

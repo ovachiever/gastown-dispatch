@@ -361,3 +361,95 @@ export interface RigSnapshot {
 	mq_state?: "idle" | "processing" | "blocked";
 	hooks_active: number;
 }
+
+// MR (Merge Request) types for analytics
+export type MRStatus =
+	| "pending"
+	| "in_flight"
+	| "in_progress"
+	| "merged"
+	| "failed"
+	| "rejected";
+
+export interface MergeRequest {
+	id: string;
+	rig: string;
+	branch: string;
+	issue_id: string;
+	issue_title?: string;
+	status: MRStatus;
+	created_at: string;
+	updated_at?: string;
+	error?: string;
+	retry_count: number;
+	blocked_by_count?: number;
+}
+
+export interface ReworkLoop {
+	issue_id: string;
+	issue_title: string;
+	rig: string;
+	cycle_count: number;
+	time_stuck_ms: number;
+	time_stuck_display: string;
+	first_failure_at: string;
+	last_failure_at?: string;
+	current_status: MRStatus;
+	mr_id: string;
+}
+
+export interface ReworkLoopSummary {
+	total_loops: number;
+	total_time_stuck_ms: number;
+	loops: ReworkLoop[];
+	worst_offenders: ReworkLoop[];
+}
+
+// MQ (Merge Queue) types
+export interface MQListFilters {
+	status?: "open" | "in_progress" | "closed";
+	ready?: boolean;
+	worker?: string;
+	epic?: string;
+}
+
+export interface MRStatusOutput {
+	id: string;
+	status: MRStatus;
+	branch: string;
+	created_at: string;
+	updated_at?: string;
+	error?: string;
+}
+
+export interface MQNextOptions {
+	strategy?: "priority" | "fifo";
+}
+
+// Patrol (Deacon) types
+export type DeaconState = "running" | "paused" | "stopped" | "error";
+export type BootStatus = "booting" | "ready" | "failed" | "degraded";
+
+export interface DeaconHeartbeat {
+	timestamp: string;
+	state: DeaconState;
+	uptime_ms: number;
+	last_patrol?: string;
+	error?: string;
+}
+
+export interface PatrolPausedState {
+	paused: boolean;
+	paused_at?: string;
+	reason?: string;
+}
+
+export interface PatrolStatus {
+	heartbeat: DeaconHeartbeat | null;
+	boot: BootStatus | null;
+	deacon_state: DeaconState | null;
+	patrol_muted: boolean;
+	patrol_paused: PatrolPausedState | null;
+	degraded_mode: boolean;
+	operational_mode: "normal" | "degraded" | "offline";
+}
