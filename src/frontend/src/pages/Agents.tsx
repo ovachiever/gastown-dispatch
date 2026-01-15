@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, AlertTriangle, Users } from "lucide-react";
 import { getStatus, removePolecat, nukePolecat } from "@/lib/api";
@@ -10,7 +11,15 @@ import { AddPolecatModal } from "@/components/AddPolecatModal";
 import type { AgentRuntime } from "@/types/api";
 
 export default function Agents() {
-	const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+	const [searchParams, setSearchParams] = useSearchParams();
+	const selectedAgent = searchParams.get("agent");
+	const setSelectedAgent = (address: string | null) => {
+		if (address) {
+			setSearchParams({ agent: address });
+		} else {
+			setSearchParams({});
+		}
+	};
 	const [nudgeModal, setNudgeModal] = useState<{ address: string; name: string } | null>(null);
 	const [addPolecatModal, setAddPolecatModal] = useState<string | null>(null);
 	const queryClient = useQueryClient();

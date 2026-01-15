@@ -1,6 +1,10 @@
+import { useSearchParams } from "react-router-dom";
 import { GitMerge, Clock, Loader2 } from "lucide-react";
 
 export default function MergeQueue() {
+  const [searchParams] = useSearchParams();
+  const rigFilter = searchParams.get("rig");
+
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       <div className="flex items-center justify-between">
@@ -11,6 +15,7 @@ export default function MergeQueue() {
           </h2>
           <p className="text-sm text-gt-muted mt-1">
             Approved PRs queued for merge
+            {rigFilter && <span className="ml-2 text-gt-accent">• Filtered by {rigFilter}</span>}
           </p>
         </div>
       </div>

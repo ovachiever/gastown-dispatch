@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Search, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,11 +8,54 @@ import { LogSourceTree } from "@/components/logs/LogSourceTree";
 import { LogViewer, type LogEntryData } from "@/components/logs";
 
 export default function Logs() {
-	const [selectedSources, setSelectedSources] = useState<Set<string>>(
-		new Set(["all"]),
-	);
-	const [search, setSearch] = useState("");
+	const [searchParams, setSearchParams] = useSearchParams();
+
+	// Initialize from URL params
+	const sourceParam = searchParams.get("source");
+	const searchParam = searchParams.get("search");
+
+	const [selectedSources, setSelectedSourcesState] = useState<Set<string>>(() => {
+		if (sourceParam) {
+			return new Set(sourceParam.split(","));
+		}
+		return new Set(["all"]);
+	});
+	const [search, setSearchState] = useState(searchParam || "");
 	const [logs, setLogs] = useState<LogEntryData[]>([]);
+
+	// Sync state to URL
+	const setSelectedSources = useCallback((sources: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+		setSelectedSourcesState((prev) => {
+			const newSources = typeof sources === "function" ? sources(prev) : sources;
+			const newParams = new URLSearchParams(searchParams);
+			if (newSources.has("all") || newSources.size === 0) {
+				newParams.delete("source");
+			} else {
+				newParams.set("source", Array.from(newSources).join(","));
+			}
+			// Preserve search param
+			if (search) {
+				newParams.set("search", search);
+			}
+			setSearchParams(newParams, { replace: true });
+			return newSources;
+		});
+	}, [searchParams, setSearchParams, search]);
+
+	const setSearch = useCallback((value: string) => {
+		setSearchState(value);
+		const newParams = new URLSearchParams(searchParams);
+		if (value) {
+			newParams.set("search", value);
+		} else {
+			newParams.delete("search");
+		}
+		// Preserve source param
+		if (!selectedSources.has("all") && selectedSources.size > 0) {
+			newParams.set("source", Array.from(selectedSources).join(","));
+		}
+		setSearchParams(newParams, { replace: true });
+	}, [searchParams, setSearchParams, selectedSources]);
 	const [connected, setConnected] = useState(false);
 	const [autoScroll, setAutoScroll] = useState(true);
 	const eventSourceRef = useRef<EventSource | null>(null);
