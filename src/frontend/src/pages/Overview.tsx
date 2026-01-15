@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import {
 	RefreshCw,
 	Play,
@@ -15,10 +14,11 @@ import {
 	Truck,
 	Radio,
 } from "lucide-react";
-import { getStatus, getConvoys, getBeads, startTown, shutdownTown, getDerivedAlarms } from "@/lib/api";
+import { getStatus, getConvoys, getBeads, startTown, shutdownTown } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useMemo } from "react";
-import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead, DerivedAlarm } from "@/types/api";
+import { useState, useEffect, useMemo, useRef } from "react";
+import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
+import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsSparklines";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -201,10 +201,9 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 }
 
 // Rig station panel (like a processing unit control panel)
-function RigStation({ rig, isActive, onClick }: {
+function RigStation({ rig, isActive }: {
 	rig: RigStatus;
 	isActive: boolean;
-	onClick?: () => void;
 }) {
 	// Calculate real metrics from rig agents
 	const rigAgents = rig.agents || [];
@@ -215,14 +214,10 @@ function RigStation({ rig, isActive, onClick }: {
 	// Note: MQ (merge queue) data not available in gt status output
 
 	return (
-		<button
-			onClick={onClick}
-			className={cn(
-				"bg-slate-900/80 border rounded-lg p-3 backdrop-blur-sm transition-all text-left w-full",
-				isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700 opacity-60",
-				onClick && "cursor-pointer hover:border-blue-400 hover:shadow-blue-400/30"
-			)}
-		>
+		<div className={cn(
+			"bg-slate-900/80 border rounded-lg p-3 backdrop-blur-sm transition-all",
+			isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700 opacity-60"
+		)}>
 			{/* Header */}
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
@@ -286,7 +281,7 @@ function RigStation({ rig, isActive, onClick }: {
 					REFINERY
 				</div>
 			</div>
-		</button>
+		</div>
 	);
 }
 
@@ -469,50 +464,45 @@ function ConvoyBatch({ convoy }: { convoy: Convoy }) {
 	);
 }
 
-// Derived Alarms Panel - shows stranded convoys, blocked queues, stale heartbeats, stuck polecats, rework loops
-function DerivedAlarmsPanel({ alarms }: { alarms: DerivedAlarm[] }) {
-	const errorCount = alarms.filter(a => a.level === "error").length;
-	const warningCount = alarms.filter(a => a.level === "warning").length;
+// Alarm panel
+function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
+	const alerts: { level: "error" | "warning" | "info"; message: string }[] = [];
 
-	// Icon and label for each alarm type
-	const getAlarmIcon = (type: DerivedAlarm["type"]) => {
-		switch (type) {
-			case "stranded_convoy":
-				return <Truck size={12} className="text-yellow-400" />;
-			case "blocked_queue":
-				return <AlertCircle size={12} className="text-red-400" />;
-			case "stale_heartbeat":
-				return <Activity size={12} className="text-orange-400" />;
-			case "stuck_polecat":
-				return <Users size={12} className="text-red-400" />;
-			case "rework_loop":
-				return <RefreshCw size={12} className="text-purple-400" />;
-			default:
-				return <AlertTriangle size={12} />;
+	// Check for agent errors
+	agents.forEach(a => {
+		if (a.state === "error") {
+			alerts.push({ level: "error", message: `${a.name}: Agent in error state` });
 		}
-	};
+		if (a.unread_mail > 5) {
+			alerts.push({ level: "warning", message: `${a.name}: ${a.unread_mail} unread messages` });
+		}
+	});
 
-	const getAlarmTypeLabel = (type: DerivedAlarm["type"]) => {
-		switch (type) {
-			case "stranded_convoy": return "STRANDED";
-			case "blocked_queue": return "BLOCKED";
-			case "stale_heartbeat": return "STALE";
-			case "stuck_polecat": return "STUCK";
-			case "rework_loop": return "LOOP";
-			default: return type;
+	// Check for rig-level issues
+	rigs.forEach(r => {
+		const rigAgents = r.agents || [];
+		const runningAgents = rigAgents.filter(a => a.running).length;
+		const totalAgents = rigAgents.length;
+
+		// Alert if rig has allocated workers but none are running
+		if ((r.polecat_count > 0 || r.crew_count > 0) && runningAgents === 0 && totalAgents > 0) {
+			alerts.push({ level: "warning", message: `${r.name}: Workers allocated but none running` });
 		}
-	};
+	});
+
+	const errorCount = alerts.filter(a => a.level === "error").length;
+	const warningCount = alerts.filter(a => a.level === "warning").length;
 
 	return (
 		<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
-					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400 animate-pulse" : "text-slate-400"} />
-					<span className="text-sm font-semibold text-slate-200">Derived Alarms</span>
+					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400" : "text-slate-400"} />
+					<span className="text-sm font-semibold text-slate-200">Alarms</span>
 				</div>
 				<div className="flex items-center gap-2">
 					{errorCount > 0 && (
-						<span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded-full font-mono animate-pulse">
+						<span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded-full font-mono">
 							{errorCount} ERR
 						</span>
 					)}
@@ -521,7 +511,7 @@ function DerivedAlarmsPanel({ alarms }: { alarms: DerivedAlarm[] }) {
 							{warningCount} WARN
 						</span>
 					)}
-					{alarms.length === 0 && (
+					{alerts.length === 0 && (
 						<span className="text-xs px-2 py-0.5 bg-green-900 text-green-300 rounded-full">
 							ALL OK
 						</span>
@@ -529,47 +519,26 @@ function DerivedAlarmsPanel({ alarms }: { alarms: DerivedAlarm[] }) {
 				</div>
 			</div>
 
-			<div className="max-h-48 overflow-y-auto space-y-1.5">
-				{alarms.length === 0 ? (
+			<div className="max-h-32 overflow-y-auto space-y-1">
+				{alerts.length === 0 ? (
 					<div className="text-xs text-slate-500 text-center py-2">
 						No active alarms
 					</div>
 				) : (
-					alarms.map((alarm, i) => (
+					alerts.slice(0, 5).map((alert, i) => (
 						<div
 							key={i}
 							className={cn(
-								"text-xs px-2 py-1.5 rounded flex items-start gap-2",
-								alarm.level === "error" ? "bg-red-900/30 text-red-300 border border-red-800/50" :
-								alarm.level === "warning" ? "bg-yellow-900/30 text-yellow-300 border border-yellow-800/50" :
-								"bg-blue-900/30 text-blue-300 border border-blue-800/50"
+								"text-xs px-2 py-1 rounded flex items-center gap-2",
+								alert.level === "error" ? "bg-red-900/30 text-red-300" :
+								alert.level === "warning" ? "bg-yellow-900/30 text-yellow-300" :
+								"bg-blue-900/30 text-blue-300"
 							)}
 						>
-							<div className="flex-shrink-0 mt-0.5">
-								{getAlarmIcon(alarm.type)}
-							</div>
-							<div className="flex-1 min-w-0">
-								<div className="flex items-center gap-1.5 mb-0.5">
-									<span className={cn(
-										"text-[9px] px-1 py-0.5 rounded uppercase font-bold",
-										alarm.level === "error" ? "bg-red-800/50 text-red-200" :
-										alarm.level === "warning" ? "bg-yellow-800/50 text-yellow-200" :
-										"bg-blue-800/50 text-blue-200"
-									)}>
-										{getAlarmTypeLabel(alarm.type)}
-									</span>
-									{alarm.rig && (
-										<span className="text-[9px] text-slate-400 font-mono">{alarm.rig}</span>
-									)}
-								</div>
-								<span className="block truncate">{alarm.message}</span>
-								{alarm.details && alarm.details.length > 0 && (
-									<div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
-										{alarm.details.slice(0, 3).join(", ")}
-										{alarm.details.length > 3 && ` +${alarm.details.length - 3} more`}
-									</div>
-								)}
-							</div>
+							{alert.level === "error" ? <AlertCircle size={12} /> :
+							 alert.level === "warning" ? <AlertTriangle size={12} /> :
+							 <CheckCircle2 size={12} />}
+							<span className="truncate">{alert.message}</span>
 						</div>
 					))
 				)}
@@ -838,8 +807,10 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 	);
 }
 
+// Ring buffer capacity - stores ~5 minutes of data at 5-second intervals
+const TREND_BUFFER_SIZE = 60;
+
 export default function Overview() {
-	const navigate = useNavigate();
 
 	const {
 		data: statusResponse,
@@ -868,22 +839,71 @@ export default function Overview() {
 		retry: 1,
 	});
 
-	const { data: alarmsResponse } = useQuery({
-		queryKey: ["alarms"],
-		queryFn: getDerivedAlarms,
-		refetchInterval: 10_000,
-		retry: 1,
+	// Trend tracking with ring buffer
+	const trendsRef = useRef<TrendData>({
+		convoysOpen: [],
+		blockedMRs: [],
+		mailBacklog: [],
+		throughput: [],
 	});
+	const lastClosedCountRef = useRef<number>(0);
+	const [trendData, setTrendData] = useState<TrendData>(trendsRef.current);
 
-	const derivedAlarms = alarmsResponse?.alarms ?? [];
+	// Compute current metric values
+	const currentMetrics = useMemo(() => {
+		const blockedMRs = statusResponse?.status?.rigs?.reduce(
+			(sum, rig) => sum + (rig.mq?.blocked || 0),
+			0
+		) || 0;
+
+		const mailBacklog = statusResponse?.status?.agents?.reduce(
+			(sum, agent) => sum + (agent.unread_mail || 0),
+			0
+		) || 0;
+
+		const closedBeads = beads.filter(b => b.status === "closed").length;
+
+		return {
+			convoysOpen: convoys.length,
+			blockedMRs,
+			mailBacklog,
+			closedBeads,
+		};
+	}, [statusResponse?.status, convoys, beads]);
+
+	// Update trends when metrics change
+	useEffect(() => {
+		if (!statusResponse?.initialized) return;
+
+		const trends = trendsRef.current;
+
+		// Helper to push to ring buffer
+		const pushToBuffer = (arr: number[], value: number) => {
+			if (arr.length >= TREND_BUFFER_SIZE) {
+				arr.shift();
+			}
+			arr.push(value);
+		};
+
+		// Push current values
+		pushToBuffer(trends.convoysOpen, currentMetrics.convoysOpen);
+		pushToBuffer(trends.blockedMRs, currentMetrics.blockedMRs);
+		pushToBuffer(trends.mailBacklog, currentMetrics.mailBacklog);
+
+		// Calculate throughput (delta of closed beads)
+		const closedDelta = Math.max(0, currentMetrics.closedBeads - lastClosedCountRef.current);
+		if (lastClosedCountRef.current > 0 || trends.throughput.length > 0) {
+			pushToBuffer(trends.throughput, closedDelta);
+		}
+		lastClosedCountRef.current = currentMetrics.closedBeads;
+
+		// Trigger re-render with updated data
+		setTrendData({ ...trends });
+	}, [currentMetrics, statusResponse?.initialized]);
 
 	const handleStart = async () => {
 		await startTown();
 		refetchStatus();
-	};
-
-	const handleRigClick = (rigName: string) => {
-		navigate(`/rigs?rig=${encodeURIComponent(rigName)}`);
 	};
 
 	const handleShutdown = async () => {
@@ -978,7 +998,7 @@ export default function Overview() {
 				<div className="h-full grid grid-cols-12 gap-4">
 					{/* Left panel - Alarms and Convoys */}
 					<div className="col-span-3 flex flex-col gap-4">
-						<DerivedAlarmsPanel alarms={derivedAlarms} />
+						<AlarmPanel agents={status.agents} rigs={status.rigs} />
 
 						{/* Convoy batch monitor */}
 						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden">
@@ -1055,7 +1075,6 @@ export default function Overview() {
 									key={rig.name}
 									rig={rig}
 									isActive={rig.polecat_count > 0 || rig.crew_count > 0}
-									onClick={() => handleRigClick(rig.name)}
 								/>
 							))
 						)}
@@ -1063,9 +1082,24 @@ export default function Overview() {
 				</div>
 			</div>
 
-			{/* Bottom status bar */}
-			<div className="bg-slate-900 border-t border-slate-700 px-4 py-2">
-				<div className="flex items-center justify-between text-xs">
+			{/* Bottom status bar with trends */}
+			<div className="bg-slate-900 border-t border-slate-700">
+				{/* Trends sparklines row */}
+				<div className="px-4 py-2 border-b border-slate-800">
+					<TrendsSparklines
+						trends={trendData}
+						currentValues={{
+							convoysOpen: currentMetrics.convoysOpen,
+							blockedMRs: currentMetrics.blockedMRs,
+							mailBacklog: currentMetrics.mailBacklog,
+							throughput: trendData.throughput.length > 0
+								? trendData.throughput[trendData.throughput.length - 1]
+								: 0,
+						}}
+					/>
+				</div>
+				{/* Status indicators row */}
+				<div className="px-4 py-1.5 flex items-center justify-between text-xs">
 					<div className="flex items-center gap-4">
 						<span className="text-slate-500">Location:</span>
 						<span className="text-slate-400 font-mono">{status.location}</span>
