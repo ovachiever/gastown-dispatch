@@ -7,6 +7,11 @@ import type {
 	Bead,
 	ActionResult,
 	BeadFilters,
+	MergeRequest,
+	MRStatusOutput,
+	MQListFilters,
+	MQNextOptions,
+	MQSummaryResponse,
 } from "@/types/api";
 
 const API_BASE = "/api";
@@ -259,4 +264,46 @@ export async function nudge(agent: string, message: string): Promise<ActionResul
 		method: "POST",
 		body: JSON.stringify({ agent, message }),
 	});
+}
+
+// Merge Queue
+export async function getMergeQueue(
+	rig: string,
+	filters?: MQListFilters,
+): Promise<MergeRequest[]> {
+	const params = new URLSearchParams();
+	if (filters?.status) params.set("status", filters.status);
+	if (filters?.worker) params.set("worker", filters.worker);
+	if (filters?.epic) params.set("epic", filters.epic);
+	if (filters?.ready) params.set("ready", "true");
+
+	const query = params.toString();
+	return fetchJson<MergeRequest[]>(
+		`/mq/${encodeURIComponent(rig)}/list${query ? `?${query}` : ""}`,
+	);
+}
+
+export async function getNextMergeRequest(
+	rig: string,
+	options?: MQNextOptions,
+): Promise<MergeRequest | null> {
+	const params = new URLSearchParams();
+	if (options?.strategy) params.set("strategy", options.strategy);
+
+	const query = params.toString();
+	return fetchJson<MergeRequest | null>(
+		`/mq/${encodeURIComponent(rig)}/next${query ? `?${query}` : ""}`,
+	);
+}
+
+export async function getMergeQueueSummary(
+	rig: string,
+): Promise<MQSummaryResponse> {
+	return fetchJson<MQSummaryResponse>(`/mq/${encodeURIComponent(rig)}/summary`);
+}
+
+export async function getMergeRequestStatus(
+	id: string,
+): Promise<MRStatusOutput> {
+	return fetchJson<MRStatusOutput>(`/mq/status/${encodeURIComponent(id)}`);
 }

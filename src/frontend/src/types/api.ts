@@ -164,3 +164,68 @@ export interface BeadFilters {
 	parent?: string;
 	limit?: number;
 }
+
+// Merge Queue types
+export interface MergeRequest {
+	id: string;
+	title: string;
+	description?: string;
+	status: string;
+	priority: number;
+	issue_type: string;
+	created_at: string;
+	updated_at: string;
+	closed_at?: string;
+	assignee?: string;
+	blocked_by?: string[];
+	blocked_by_count?: number;
+	labels?: string[];
+}
+
+export interface MRStatusOutput {
+	id: string;
+	title: string;
+	status: string;
+	priority: number;
+	type: string;
+	assignee?: string;
+	created_at: string;
+	updated_at: string;
+	closed_at?: string;
+	branch?: string;
+	target?: string;
+	source_issue?: string;
+	worker?: string;
+	rig?: string;
+	merge_commit?: string;
+	close_reason?: string;
+	depends_on?: MRDependencyInfo[];
+	blocks?: MRDependencyInfo[];
+}
+
+export interface MRDependencyInfo {
+	id: string;
+	title: string;
+	status: string;
+	priority: number;
+	type: string;
+}
+
+export interface MQListFilters {
+	status?: string;
+	worker?: string;
+	epic?: string;
+	ready?: boolean;
+}
+
+export interface MQNextOptions {
+	strategy?: "priority" | "fifo";
+}
+
+export interface MQSummaryResponse {
+	total: number;
+	ready: number;
+	blocked: number;
+	in_progress: number;
+	items: MergeRequest[];
+}
