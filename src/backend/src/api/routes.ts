@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { getTownStatus } from "../services/status.js";
+import { getDerivedAlarms } from "../services/alarms.js";
 import {
 	listConvoys,
 	getConvoyStatus,
@@ -78,6 +79,14 @@ router.get(
 	asyncHandler(async (req, res) => {
 		const status = await getTownStatus(getTownRoot(req));
 		res.json(status);
+	}),
+);
+
+router.get(
+	"/alarms",
+	asyncHandler(async (req, res) => {
+		const alarms = await getDerivedAlarms(getTownRoot(req));
+		res.json(alarms);
 	}),
 );
 

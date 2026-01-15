@@ -164,3 +164,22 @@ export interface BeadFilters {
 	parent?: string;
 	limit?: number;
 }
+
+export interface DerivedAlarm {
+	type: "stranded_convoy" | "blocked_queue" | "stale_heartbeat" | "stuck_polecat" | "rework_loop";
+	level: "error" | "warning" | "info";
+	message: string;
+	details?: string[];
+	rig?: string;
+	convoy_id?: string;
+	agent?: string;
+}
+
+export interface AlarmsResponse {
+	alarms: DerivedAlarm[];
+	summary: {
+		total: number;
+		errors: number;
+		warnings: number;
+	};
+}

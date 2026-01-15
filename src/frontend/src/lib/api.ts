@@ -7,6 +7,7 @@ import type {
 	Bead,
 	ActionResult,
 	BeadFilters,
+	AlarmsResponse,
 } from "@/types/api";
 
 const API_BASE = "/api";
@@ -33,6 +34,11 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 // Status
 export async function getStatus(): Promise<StatusResponse> {
 	return fetchJson<StatusResponse>("/status");
+}
+
+// Alarms
+export async function getDerivedAlarms(): Promise<AlarmsResponse> {
+	return fetchJson<AlarmsResponse>("/alarms");
 }
 
 // Convoys
