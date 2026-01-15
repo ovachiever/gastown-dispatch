@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
 	RefreshCw,
 	Play,
@@ -200,9 +201,10 @@ function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive =
 }
 
 // Rig station panel (like a processing unit control panel)
-function RigStation({ rig, isActive }: {
+function RigStation({ rig, isActive, onClick }: {
 	rig: RigStatus;
 	isActive: boolean;
+	onClick?: () => void;
 }) {
 	// Calculate real metrics from rig agents
 	const rigAgents = rig.agents || [];
@@ -213,10 +215,14 @@ function RigStation({ rig, isActive }: {
 	// Note: MQ (merge queue) data not available in gt status output
 
 	return (
-		<div className={cn(
-			"bg-slate-900/80 border rounded-lg p-3 backdrop-blur-sm transition-all",
-			isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700 opacity-60"
-		)}>
+		<button
+			onClick={onClick}
+			className={cn(
+				"bg-slate-900/80 border rounded-lg p-3 backdrop-blur-sm transition-all text-left w-full",
+				isActive ? "border-blue-500 shadow-lg shadow-blue-500/20" : "border-slate-700 opacity-60",
+				onClick && "cursor-pointer hover:border-blue-400 hover:shadow-blue-400/30"
+			)}
+		>
 			{/* Header */}
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
@@ -280,7 +286,7 @@ function RigStation({ rig, isActive }: {
 					REFINERY
 				</div>
 			</div>
-		</div>
+		</button>
 	);
 }
 
@@ -807,6 +813,7 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 }
 
 export default function Overview() {
+	const navigate = useNavigate();
 
 	const {
 		data: statusResponse,
@@ -838,6 +845,10 @@ export default function Overview() {
 	const handleStart = async () => {
 		await startTown();
 		refetchStatus();
+	};
+
+	const handleRigClick = (rigName: string) => {
+		navigate(`/rigs?rig=${encodeURIComponent(rigName)}`);
 	};
 
 	const handleShutdown = async () => {
@@ -1009,6 +1020,7 @@ export default function Overview() {
 									key={rig.name}
 									rig={rig}
 									isActive={rig.polecat_count > 0 || rig.crew_count > 0}
+									onClick={() => handleRigClick(rig.name)}
 								/>
 							))
 						)}
