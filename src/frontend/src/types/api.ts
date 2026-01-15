@@ -134,7 +134,7 @@ export interface Bead {
 	title: string;
 	description?: string;
 	status: "open" | "in_progress" | "hooked" | "closed";
-	type: "bug" | "feature" | "task" | "epic" | "chore" | "convoy" | "agent";
+	type: "bug" | "feature" | "task" | "epic" | "chore" | "convoy" | "agent" | "merge-request" | "molecule";
 	priority: number;
 	assignee?: string;
 	labels?: string[];
@@ -142,6 +142,11 @@ export interface Bead {
 	created_at: string;
 	updated_at?: string;
 	created_by?: string;
+	// MR-specific fields (populated for merge-request type)
+	source_branch?: string;
+	target_branch?: string;
+	commits?: string[];
+	linked_issue?: string;
 }
 
 export interface ActionResult {
