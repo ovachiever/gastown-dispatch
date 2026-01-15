@@ -14,12 +14,10 @@ import {
 	Truck,
 	Radio,
 } from "lucide-react";
-import { getStatus, getConvoys, getBeads, startTown, shutdownTown } from "@/lib/api";
+import { getStatus, getConvoys, getBeads, startTown, shutdownTown, getDerivedAlarms } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo } from "react";
-import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
-import { WIPGauge } from "@/components/dashboard/WIPGauge";
-import { StallDetector, calculateStallItems } from "@/components/dashboard/StallDetector";
+import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead, DerivedAlarm } from "@/types/api";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -465,45 +463,50 @@ function ConvoyBatch({ convoy }: { convoy: Convoy }) {
 	);
 }
 
-// Alarm panel
-function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
-	const alerts: { level: "error" | "warning" | "info"; message: string }[] = [];
+// Derived Alarms Panel - shows stranded convoys, blocked queues, stale heartbeats, stuck polecats, rework loops
+function DerivedAlarmsPanel({ alarms }: { alarms: DerivedAlarm[] }) {
+	const errorCount = alarms.filter(a => a.level === "error").length;
+	const warningCount = alarms.filter(a => a.level === "warning").length;
 
-	// Check for agent errors
-	agents.forEach(a => {
-		if (a.state === "error") {
-			alerts.push({ level: "error", message: `${a.name}: Agent in error state` });
+	// Icon and label for each alarm type
+	const getAlarmIcon = (type: DerivedAlarm["type"]) => {
+		switch (type) {
+			case "stranded_convoy":
+				return <Truck size={12} className="text-yellow-400" />;
+			case "blocked_queue":
+				return <AlertCircle size={12} className="text-red-400" />;
+			case "stale_heartbeat":
+				return <Activity size={12} className="text-orange-400" />;
+			case "stuck_polecat":
+				return <Users size={12} className="text-red-400" />;
+			case "rework_loop":
+				return <RefreshCw size={12} className="text-purple-400" />;
+			default:
+				return <AlertTriangle size={12} />;
 		}
-		if (a.unread_mail > 5) {
-			alerts.push({ level: "warning", message: `${a.name}: ${a.unread_mail} unread messages` });
+	};
+
+	const getAlarmTypeLabel = (type: DerivedAlarm["type"]) => {
+		switch (type) {
+			case "stranded_convoy": return "STRANDED";
+			case "blocked_queue": return "BLOCKED";
+			case "stale_heartbeat": return "STALE";
+			case "stuck_polecat": return "STUCK";
+			case "rework_loop": return "LOOP";
+			default: return type;
 		}
-	});
-
-	// Check for rig-level issues
-	rigs.forEach(r => {
-		const rigAgents = r.agents || [];
-		const runningAgents = rigAgents.filter(a => a.running).length;
-		const totalAgents = rigAgents.length;
-
-		// Alert if rig has allocated workers but none are running
-		if ((r.polecat_count > 0 || r.crew_count > 0) && runningAgents === 0 && totalAgents > 0) {
-			alerts.push({ level: "warning", message: `${r.name}: Workers allocated but none running` });
-		}
-	});
-
-	const errorCount = alerts.filter(a => a.level === "error").length;
-	const warningCount = alerts.filter(a => a.level === "warning").length;
+	};
 
 	return (
 		<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
-					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400" : "text-slate-400"} />
-					<span className="text-sm font-semibold text-slate-200">Alarms</span>
+					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400 animate-pulse" : "text-slate-400"} />
+					<span className="text-sm font-semibold text-slate-200">Derived Alarms</span>
 				</div>
 				<div className="flex items-center gap-2">
 					{errorCount > 0 && (
-						<span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded-full font-mono">
+						<span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded-full font-mono animate-pulse">
 							{errorCount} ERR
 						</span>
 					)}
@@ -512,7 +515,7 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 							{warningCount} WARN
 						</span>
 					)}
-					{alerts.length === 0 && (
+					{alarms.length === 0 && (
 						<span className="text-xs px-2 py-0.5 bg-green-900 text-green-300 rounded-full">
 							ALL OK
 						</span>
@@ -520,26 +523,47 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 				</div>
 			</div>
 
-			<div className="max-h-32 overflow-y-auto space-y-1">
-				{alerts.length === 0 ? (
+			<div className="max-h-48 overflow-y-auto space-y-1.5">
+				{alarms.length === 0 ? (
 					<div className="text-xs text-slate-500 text-center py-2">
 						No active alarms
 					</div>
 				) : (
-					alerts.slice(0, 5).map((alert, i) => (
+					alarms.map((alarm, i) => (
 						<div
 							key={i}
 							className={cn(
-								"text-xs px-2 py-1 rounded flex items-center gap-2",
-								alert.level === "error" ? "bg-red-900/30 text-red-300" :
-								alert.level === "warning" ? "bg-yellow-900/30 text-yellow-300" :
-								"bg-blue-900/30 text-blue-300"
+								"text-xs px-2 py-1.5 rounded flex items-start gap-2",
+								alarm.level === "error" ? "bg-red-900/30 text-red-300 border border-red-800/50" :
+								alarm.level === "warning" ? "bg-yellow-900/30 text-yellow-300 border border-yellow-800/50" :
+								"bg-blue-900/30 text-blue-300 border border-blue-800/50"
 							)}
 						>
-							{alert.level === "error" ? <AlertCircle size={12} /> :
-							 alert.level === "warning" ? <AlertTriangle size={12} /> :
-							 <CheckCircle2 size={12} />}
-							<span className="truncate">{alert.message}</span>
+							<div className="flex-shrink-0 mt-0.5">
+								{getAlarmIcon(alarm.type)}
+							</div>
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center gap-1.5 mb-0.5">
+									<span className={cn(
+										"text-[9px] px-1 py-0.5 rounded uppercase font-bold",
+										alarm.level === "error" ? "bg-red-800/50 text-red-200" :
+										alarm.level === "warning" ? "bg-yellow-800/50 text-yellow-200" :
+										"bg-blue-800/50 text-blue-200"
+									)}>
+										{getAlarmTypeLabel(alarm.type)}
+									</span>
+									{alarm.rig && (
+										<span className="text-[9px] text-slate-400 font-mono">{alarm.rig}</span>
+									)}
+								</div>
+								<span className="block truncate">{alarm.message}</span>
+								{alarm.details && alarm.details.length > 0 && (
+									<div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
+										{alarm.details.slice(0, 3).join(", ")}
+										{alarm.details.length > 3 && ` +${alarm.details.length - 3} more`}
+									</div>
+								)}
+							</div>
 						</div>
 					))
 				)}
@@ -837,6 +861,15 @@ export default function Overview() {
 		retry: 1,
 	});
 
+	const { data: alarmsResponse } = useQuery({
+		queryKey: ["alarms"],
+		queryFn: getDerivedAlarms,
+		refetchInterval: 10_000,
+		retry: 1,
+	});
+
+	const derivedAlarms = alarmsResponse?.alarms ?? [];
+
 	const handleStart = async () => {
 		await startTown();
 		refetchStatus();
@@ -932,26 +965,9 @@ export default function Overview() {
 			{/* Main dashboard area */}
 			<div className="flex-1 p-4 overflow-hidden">
 				<div className="h-full grid grid-cols-12 gap-4">
-					{/* Left panel - WIP Gauge, Stall Detector, Alarms and Convoys */}
-					<div className="col-span-3 flex flex-col gap-4 overflow-y-auto">
-						{/* WIP Gauge */}
-						<WIPGauge
-							activePolecats={status.rigs.flatMap(r => r.agents || []).filter(a => a.running && a.has_work).length}
-							activeHooks={status.summary.active_hooks}
-							inProgressSteps={beads.filter(b => b.status === "in_progress" || b.status === "hooked").length}
-						/>
-
-						{/* Stall Detector */}
-						<StallDetector
-							items={calculateStallItems(
-								status.rigs.flatMap(r => r.agents || []),
-								beads,
-								new Date()
-							)}
-							thresholdMs={30 * 60 * 1000}
-						/>
-
-						<AlarmPanel agents={status.agents} rigs={status.rigs} />
+					{/* Left panel - Alarms and Convoys */}
+					<div className="col-span-3 flex flex-col gap-4">
+						<DerivedAlarmsPanel alarms={derivedAlarms} />
 
 						{/* Convoy batch monitor */}
 						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden">

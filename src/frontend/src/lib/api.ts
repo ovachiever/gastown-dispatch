@@ -7,8 +7,7 @@ import type {
 	Bead,
 	ActionResult,
 	BeadFilters,
-	MailMessage,
-	MailInboxFilters,
+	AlarmsResponse,
 } from "@/types/api";
 
 const API_BASE = "/api";
@@ -35,6 +34,11 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 // Status
 export async function getStatus(): Promise<StatusResponse> {
 	return fetchJson<StatusResponse>("/status");
+}
+
+// Alarms
+export async function getDerivedAlarms(): Promise<AlarmsResponse> {
+	return fetchJson<AlarmsResponse>("/alarms");
 }
 
 // Convoys
@@ -261,47 +265,4 @@ export async function nudge(agent: string, message: string): Promise<ActionResul
 		method: "POST",
 		body: JSON.stringify({ agent, message }),
 	});
-}
-
-// Mail
-export async function getMailInbox(
-	filters?: MailInboxFilters,
-): Promise<MailMessage[]> {
-	const params = new URLSearchParams();
-	if (filters?.address) params.set("address", filters.address);
-	if (filters?.unread) params.set("unread", "true");
-
-	const query = params.toString();
-	return fetchJson<MailMessage[]>(`/mail/inbox${query ? `?${query}` : ""}`);
-}
-
-export async function getMailMessage(id: string): Promise<MailMessage> {
-	return fetchJson<MailMessage>(`/mail/messages/${encodeURIComponent(id)}`);
-}
-
-export async function getMailThread(threadId: string): Promise<MailMessage[]> {
-	return fetchJson<MailMessage[]>(
-		`/mail/threads/${encodeURIComponent(threadId)}`,
-	);
-}
-
-export async function markMailRead(id: string): Promise<ActionResult> {
-	return fetchJson<ActionResult>(
-		`/mail/messages/${encodeURIComponent(id)}/read`,
-		{ method: "POST" },
-	);
-}
-
-export async function markMailUnread(id: string): Promise<ActionResult> {
-	return fetchJson<ActionResult>(
-		`/mail/messages/${encodeURIComponent(id)}/unread`,
-		{ method: "POST" },
-	);
-}
-
-export async function archiveMail(id: string): Promise<ActionResult> {
-	return fetchJson<ActionResult>(
-		`/mail/messages/${encodeURIComponent(id)}/archive`,
-		{ method: "POST" },
-	);
 }

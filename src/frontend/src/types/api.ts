@@ -80,11 +80,6 @@ export interface Convoy {
 	progress?: string;
 	completed?: number;
 	total?: number;
-	// Synthesis-related fields (populated for list view)
-	formula?: string;
-	molecule?: string;
-	synthesis_ready?: boolean;
-	is_stranded?: boolean;
 }
 
 export interface TrackedIssue {
@@ -170,26 +165,21 @@ export interface BeadFilters {
 	limit?: number;
 }
 
-// Mail types
-export type MailPriority = "urgent" | "high" | "normal" | "low" | "backlog";
-export type MailType = "task" | "scavenge" | "notification" | "reply";
-
-export interface MailMessage {
-	id: string;
-	from: string;
-	to: string;
-	subject: string;
-	body: string;
-	timestamp: string;
-	read: boolean;
-	priority: MailPriority;
-	type: MailType;
-	thread_id: string;
-	cc?: string[];
-	reply_to?: string;
+export interface DerivedAlarm {
+	type: "stranded_convoy" | "blocked_queue" | "stale_heartbeat" | "stuck_polecat" | "rework_loop";
+	level: "error" | "warning" | "info";
+	message: string;
+	details?: string[];
+	rig?: string;
+	convoy_id?: string;
+	agent?: string;
 }
 
-export interface MailInboxFilters {
-	address?: string;
-	unread?: boolean;
+export interface AlarmsResponse {
+	alarms: DerivedAlarm[];
+	summary: {
+		total: number;
+		errors: number;
+		warnings: number;
+	};
 }
