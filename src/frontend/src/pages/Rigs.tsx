@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
 	RefreshCw,
 	Power,
@@ -9,6 +10,7 @@ import {
 	MemoryStick,
 	ToggleLeft,
 	ToggleRight,
+	ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -64,18 +66,25 @@ function RigCard({
 	rig,
 	onToggle,
 	isToggling,
+	isSelected,
+	onSelect,
 }: {
 	rig: RigInfo;
 	onToggle: (enable: boolean) => void;
 	isToggling: boolean;
+	isSelected: boolean;
+	onSelect: () => void;
 }) {
 	return (
-		<div
+		<button
+			onClick={onSelect}
 			className={cn(
-				"rounded-lg border p-4 transition-all",
-				rig.witnessRunning
-					? "border-green-600/50 bg-green-950/20"
-					: "border-gt-border bg-gt-card",
+				"relative w-full text-left rounded-lg border p-4 pr-10 transition-all",
+				isSelected
+					? "border-gt-accent bg-gt-accent/10"
+					: rig.witnessRunning
+						? "border-green-600/50 bg-green-950/20 hover:border-gt-accent/50"
+						: "border-gt-border bg-gt-card hover:border-gt-accent/50",
 			)}
 		>
 			<div className="flex items-center justify-between mb-3">
@@ -91,7 +100,10 @@ function RigCard({
 				</div>
 
 				<button
-					onClick={() => onToggle(!rig.enabled)}
+					onClick={(e) => {
+						e.stopPropagation();
+						onToggle(!rig.enabled);
+					}}
 					disabled={isToggling}
 					className={cn(
 						"p-1.5 rounded transition-colors",
@@ -144,11 +156,29 @@ function RigCard({
 			<div className="mt-2 text-xs text-gt-muted truncate" title={rig.gitUrl}>
 				{rig.gitUrl}
 			</div>
-		</div>
+
+			<ChevronRight
+				size={16}
+				className={cn(
+					"absolute right-4 top-1/2 -translate-y-1/2 transition-transform",
+					isSelected ? "text-gt-accent rotate-90" : "text-gt-muted",
+				)}
+			/>
+		</button>
 	);
 }
 
 export default function Rigs() {
+	const [searchParams, setSearchParams] = useSearchParams();
+	const selectedRig = searchParams.get("rig");
+	const setSelectedRig = (name: string | null) => {
+		if (name) {
+			setSearchParams({ rig: name });
+		} else {
+			setSearchParams({});
+		}
+	};
+
 	const queryClient = useQueryClient();
 
 	const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -286,6 +316,10 @@ export default function Rigs() {
 							isToggling={
 								toggleMutation.isPending &&
 								toggleMutation.variables?.name === rig.name
+							}
+							isSelected={selectedRig === rig.name}
+							onSelect={() =>
+								setSelectedRig(selectedRig === rig.name ? null : rig.name)
 							}
 						/>
 					))}

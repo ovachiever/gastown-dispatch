@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	RefreshCw,
@@ -1421,7 +1422,15 @@ function CreateConvoyModal({
 
 // Main page component
 export default function Convoys() {
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [searchParams, setSearchParams] = useSearchParams();
+	const selectedId = searchParams.get("selected");
+	const setSelectedId = (id: string | null) => {
+		if (id) {
+			setSearchParams({ selected: id });
+		} else {
+			setSearchParams({});
+		}
+	};
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [startingConvoyId, setStartingConvoyId] = useState<string | null>(null);
 
