@@ -125,7 +125,30 @@ export async function listConvoys(
 	if (status) {
 		args.push(`--status=${status}`);
 	}
-	return runGtJson<Convoy[]>(args, { cwd: townRoot });
+	const convoys = await runGtJson<Convoy[]>(args, { cwd: townRoot });
+
+	// Enrich each convoy with synthesis-related fields from description
+	return convoys.map((convoy) => {
+		const metadata = parseConvoyDescription(convoy.description);
+		const completed = convoy.completed ?? 0;
+		const total = convoy.total ?? 0;
+
+		// Determine synthesis readiness (all issues completed)
+		const synthesisReady = total > 0 && completed === total;
+
+		// Determine if stranded (has open unassigned issues)
+		const isStranded = convoy.tracked_issues?.some(
+			(t) => t.status === "open" && !t.assignee,
+		);
+
+		return {
+			...convoy,
+			formula: metadata.formula,
+			molecule: metadata.molecule,
+			synthesis_ready: synthesisReady,
+			is_stranded: isStranded,
+		};
+	});
 }
 
 export async function getConvoyStatus(

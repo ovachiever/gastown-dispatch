@@ -162,7 +162,11 @@ function ConvoyCard({
 			</div>
 
 			<div className="mt-2 flex items-center justify-between gap-2">
-				<ConvoyStatusBadge status={convoy.status} />
+				<ConvoyStatusBadge
+					status={convoy.status}
+					isStranded={convoy.is_stranded}
+					synthesisReady={convoy.synthesis_ready}
+				/>
 				<MiniProgress
 					completed={convoy.completed || 0}
 					total={convoy.total || 0}
@@ -988,6 +992,175 @@ function EmptyDetailState() {
 	);
 }
 
+// Synthesis Gate Panel - shows all convoys ready for synthesis vs blocked
+function SynthesisGatePanel({
+	convoys,
+	onSelectConvoy,
+	onStartSynthesis,
+	isStarting,
+	startingConvoyId,
+}: {
+	convoys: Convoy[];
+	onSelectConvoy: (id: string) => void;
+	onStartSynthesis: (convoyId: string) => void;
+	isStarting: boolean;
+	startingConvoyId: string | null;
+}) {
+	const [isExpanded, setIsExpanded] = useState(true);
+
+	// Filter to only open convoys that need synthesis
+	const synthesisConvoys = convoys.filter(
+		(c) => c.status === "open" && (c.formula || c.molecule),
+	);
+
+	// Separate into ready and blocked
+	const readyConvoys = synthesisConvoys.filter((c) => c.synthesis_ready);
+	const blockedConvoys = synthesisConvoys.filter((c) => !c.synthesis_ready);
+
+	// Don't show if no convoys need synthesis
+	if (synthesisConvoys.length === 0) return null;
+
+	return (
+		<div className="mx-4 mt-4">
+			<div
+				className={cn(
+					"rounded-lg border transition-all",
+					readyConvoys.length > 0
+						? "bg-blue-900/10 border-blue-500/40"
+						: "bg-gt-surface border-gt-border",
+				)}
+			>
+				{/* Header */}
+				<button
+					onClick={() => setIsExpanded(!isExpanded)}
+					className="w-full flex items-center justify-between p-3 hover:bg-gt-bg/30 rounded-t-lg transition-colors"
+				>
+					<div className="flex items-center gap-3">
+						<Beaker
+							size={18}
+							className={readyConvoys.length > 0 ? "text-blue-400" : "text-gt-muted"}
+						/>
+						<div className="text-left">
+							<h3 className="font-medium text-sm">Synthesis Gate</h3>
+							<p className="text-xs text-gt-muted">
+								{readyConvoys.length} ready, {blockedConvoys.length} blocked
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center gap-2">
+						{readyConvoys.length > 0 && (
+							<span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/30 text-blue-300">
+								{readyConvoys.length} Ready
+							</span>
+						)}
+						<ChevronRight
+							size={16}
+							className={cn(
+								"text-gt-muted transition-transform",
+								isExpanded && "rotate-90",
+							)}
+						/>
+					</div>
+				</button>
+
+				{/* Content */}
+				{isExpanded && (
+					<div className="px-3 pb-3 space-y-3">
+						{/* Ready for Synthesis */}
+						{readyConvoys.length > 0 && (
+							<div>
+								<h4 className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1.5">
+									<CheckCircle2 size={12} />
+									Ready for Synthesis
+								</h4>
+								<div className="space-y-1.5">
+									{readyConvoys.map((convoy) => (
+										<div
+											key={convoy.id}
+											className="flex items-center justify-between gap-2 p-2 rounded-lg bg-blue-900/20 border border-blue-500/30"
+										>
+											<button
+												onClick={() => onSelectConvoy(convoy.id)}
+												className="flex items-center gap-2 min-w-0 flex-1 text-left hover:opacity-80"
+											>
+												<Truck size={14} className="text-blue-400 flex-shrink-0" />
+												<div className="min-w-0">
+													<p className="text-sm font-medium truncate">{convoy.title}</p>
+													<p className="text-xs text-gt-muted truncate">
+														{convoy.completed}/{convoy.total} issues completed
+													</p>
+												</div>
+											</button>
+											<button
+												onClick={() => onStartSynthesis(convoy.id)}
+												disabled={isStarting && startingConvoyId === convoy.id}
+												className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors disabled:opacity-50 flex-shrink-0"
+											>
+												{isStarting && startingConvoyId === convoy.id ? (
+													<>
+														<Loader2 className="animate-spin" size={12} />
+														Starting...
+													</>
+												) : (
+													<>
+														<Play size={12} />
+														Start Synthesis
+													</>
+												)}
+											</button>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Blocked */}
+						{blockedConvoys.length > 0 && (
+							<div>
+								<h4 className="text-xs font-medium text-amber-300 mb-2 flex items-center gap-1.5">
+									<AlertTriangle size={12} />
+									Blocked ({blockedConvoys.length})
+								</h4>
+								<div className="space-y-1.5">
+									{blockedConvoys.slice(0, 5).map((convoy) => {
+										const remaining = (convoy.total ?? 0) - (convoy.completed ?? 0);
+										return (
+											<button
+												key={convoy.id}
+												onClick={() => onSelectConvoy(convoy.id)}
+												className="w-full flex items-center justify-between gap-2 p-2 rounded-lg bg-gt-bg/50 border border-gt-border hover:border-gt-accent/50 transition-colors text-left"
+											>
+												<div className="flex items-center gap-2 min-w-0">
+													<Truck size={14} className="text-amber-400 flex-shrink-0" />
+													<div className="min-w-0">
+														<p className="text-sm truncate">{convoy.title}</p>
+														<p className="text-xs text-gt-muted">
+															{remaining} issue{remaining !== 1 ? "s" : ""} remaining
+														</p>
+													</div>
+												</div>
+												<MiniProgress
+													completed={convoy.completed ?? 0}
+													total={convoy.total ?? 0}
+												/>
+											</button>
+										);
+									})}
+									{blockedConvoys.length > 5 && (
+										<p className="text-xs text-gt-muted px-2">
+											+{blockedConvoys.length - 5} more blocked convoys
+										</p>
+									)}
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+}
+
 // Create Convoy Modal
 function CreateConvoyModal({
 	isOpen,
@@ -1250,9 +1423,30 @@ function CreateConvoyModal({
 export default function Convoys() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
+	const [startingConvoyId, setStartingConvoyId] = useState<string | null>(null);
+
+	const queryClient = useQueryClient();
 
 	// SSE subscription for real-time updates
 	useConvoySubscription({ enabled: true });
+
+	// Synthesis mutation for gate panel
+	const synthesisMutation = useMutation({
+		mutationFn: (convoyId: string) => startSynthesis(convoyId),
+		onMutate: (convoyId) => {
+			setStartingConvoyId(convoyId);
+		},
+		onSuccess: (_data, convoyId) => {
+			queryClient.invalidateQueries({ queryKey: ["convoys"] });
+			queryClient.invalidateQueries({ queryKey: ["convoy-detail", convoyId] });
+			queryClient.invalidateQueries({
+				queryKey: ["synthesis-status", convoyId],
+			});
+		},
+		onSettled: () => {
+			setStartingConvoyId(null);
+		},
+	});
 
 	const {
 		data: convoys,
@@ -1320,6 +1514,17 @@ export default function Convoys() {
 					</button>
 				</div>
 			</div>
+
+			{/* Synthesis Gate Panel */}
+			{convoys && convoys.length > 0 && (
+				<SynthesisGatePanel
+					convoys={convoys}
+					onSelectConvoy={setSelectedId}
+					onStartSynthesis={(convoyId) => synthesisMutation.mutate(convoyId)}
+					isStarting={synthesisMutation.isPending}
+					startingConvoyId={startingConvoyId}
+				/>
+			)}
 
 			{/* Master-detail layout */}
 			<div className="flex-1 flex min-h-0">

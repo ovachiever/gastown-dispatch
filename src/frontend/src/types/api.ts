@@ -80,6 +80,11 @@ export interface Convoy {
 	progress?: string;
 	completed?: number;
 	total?: number;
+	// Synthesis-related fields (populated for list view)
+	formula?: string;
+	molecule?: string;
+	synthesis_ready?: boolean;
+	is_stranded?: boolean;
 }
 
 export interface TrackedIssue {
