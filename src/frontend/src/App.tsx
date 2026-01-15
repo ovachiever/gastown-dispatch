@@ -23,6 +23,7 @@ import SettingsPage from "@/pages/Settings";
 import Onboarding from "@/pages/Onboarding";
 import Rigs from "@/pages/Rigs";
 import Pipeline from "@/pages/Pipeline";
+import TownBanner from "@/components/TownBanner";
 import PipelineReviews from "@/pages/pipeline/Reviews";
 import PipelineMergeQueue from "@/pages/pipeline/MergeQueue";
 import PipelineTests from "@/pages/pipeline/Tests";
@@ -72,9 +73,13 @@ function NavItem({
 
 export default function App() {
 	return (
-		<div className="flex h-screen overflow-hidden">
-			{/* Sidebar */}
-			<aside className="w-56 bg-gt-surface border-r border-gt-border flex flex-col">
+		<div className="flex flex-col h-screen overflow-hidden">
+			{/* Top Banner */}
+			<TownBanner />
+
+			<div className="flex flex-1 overflow-hidden">
+				{/* Sidebar */}
+				<aside className="w-56 bg-gt-surface border-r border-gt-border flex flex-col">
 				<div className="p-4 border-b border-gt-border">
 					<h1 className="text-lg font-semibold flex items-center gap-2">
 						<span className="text-gt-accent">⛽</span>
@@ -130,6 +135,7 @@ export default function App() {
 					<Route path="/onboarding" element={<Onboarding />} />
 				</Routes>
 			</main>
+			</div>
 		</div>
 	);
 }
