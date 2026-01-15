@@ -134,7 +134,7 @@ export interface Bead {
 	title: string;
 	description?: string;
 	status: "open" | "in_progress" | "hooked" | "closed";
-	type: "bug" | "feature" | "task" | "epic" | "chore" | "convoy" | "agent" | "merge-request" | "molecule";
+	type: "bug" | "feature" | "task" | "epic" | "chore" | "convoy" | "agent";
 	priority: number;
 	assignee?: string;
 	labels?: string[];
@@ -142,11 +142,6 @@ export interface Bead {
 	created_at: string;
 	updated_at?: string;
 	created_by?: string;
-	// MR-specific fields (populated for merge-request type)
-	source_branch?: string;
-	target_branch?: string;
-	commits?: string[];
-	linked_issue?: string;
 }
 
 export interface ActionResult {
@@ -170,21 +165,34 @@ export interface BeadFilters {
 	limit?: number;
 }
 
-export interface DerivedAlarm {
-	type: "stranded_convoy" | "blocked_queue" | "stale_heartbeat" | "stuck_polecat" | "rework_loop";
-	level: "error" | "warning" | "info";
-	message: string;
-	details?: string[];
-	rig?: string;
+// Merge Queue types
+export interface MergeRequest {
+	id: string;
+	status: "ready" | "in_progress" | "blocked" | "merged" | "rejected";
+	priority: string;
+	branch: string;
+	worker: string;
+	age: string;
+	blocked_by?: string;
 	convoy_id?: string;
-	agent?: string;
+	bead_ids?: string[];
+	created_at?: string;
+	submitted_by?: string;
 }
 
-export interface AlarmsResponse {
-	alarms: DerivedAlarm[];
+export interface MergeQueueListResponse {
+	rig: string;
+	requests: MergeRequest[];
 	summary: {
 		total: number;
-		errors: number;
-		warnings: number;
+		ready: number;
+		in_progress: number;
+		blocked: number;
 	};
+}
+
+export interface NextMergeRequest {
+	rig: string;
+	request: MergeRequest | null;
+	strategy: "priority" | "fifo";
 }

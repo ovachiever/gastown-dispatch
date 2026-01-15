@@ -45,6 +45,12 @@ import {
 	enableAllRigs,
 	disableAllRigs,
 } from "../services/rigs.js";
+import {
+	getMergeQueueList,
+	getNextMergeRequest,
+	getMergeRequestStatus,
+	getAllRigsMergeQueues,
+} from "../services/mergeQueue.js";
 import type {
 	ConvoyCreateRequest,
 	ConvoyCloseRequest,
@@ -494,6 +500,69 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const result = await disableAllRigs(getTownRoot(req));
 		res.json(result);
+	}),
+);
+
+// =====================
+// Merge Queue
+// =====================
+
+router.get(
+	"/mq/:rig",
+	asyncHandler(async (req, res) => {
+		const options = {
+			status: req.query.status as "open" | "in_progress" | "closed" | undefined,
+			ready: req.query.ready === "true",
+			worker: req.query.worker as string | undefined,
+			epic: req.query.epic as string | undefined,
+		};
+		const queue = await getMergeQueueList(
+			req.params.rig,
+			options,
+			getTownRoot(req),
+		);
+		res.json(queue);
+	}),
+);
+
+router.get(
+	"/mq/:rig/next",
+	asyncHandler(async (req, res) => {
+		const strategy = (req.query.strategy as "priority" | "fifo") || "priority";
+		const next = await getNextMergeRequest(
+			req.params.rig,
+			strategy,
+			getTownRoot(req),
+		);
+		res.json(next);
+	}),
+);
+
+router.get(
+	"/mq/status/:id",
+	asyncHandler(async (req, res) => {
+		const status = await getMergeRequestStatus(req.params.id, getTownRoot(req));
+		if (!status) {
+			res.status(404).json({ success: false, message: "MR not found" });
+			return;
+		}
+		res.json(status);
+	}),
+);
+
+router.get(
+	"/mq",
+	asyncHandler(async (req, res) => {
+		const rigNames = (req.query.rigs as string)?.split(",") || [];
+		if (rigNames.length === 0) {
+			res.status(400).json({
+				success: false,
+				message: "rigs query param required",
+			});
+			return;
+		}
+		const queues = await getAllRigsMergeQueues(rigNames, getTownRoot(req));
+		res.json(queues);
 	}),
 );
 
