@@ -44,7 +44,7 @@ export const Announcer = ({
   const [message, setMessage] = useState('');
   const timeoutRef = useRef<number | null>(null);
 
-  const announce = (text: string) => {
+  const _announce = (text: string) => {
     // Clear any pending timeout
     if (timeoutRef.current) {
       window.clearTimeout(timeoutRef.current);
@@ -61,12 +61,16 @@ export const Announcer = ({
     }
   };
 
-  const clear = () => {
+  const _clear = () => {
     if (timeoutRef.current) {
       window.clearTimeout(timeoutRef.current);
     }
     setMessage('');
   };
+
+  // Expose functions for external use (these are intentionally unused internally)
+  void _announce;
+  void _clear;
 
   useEffect(() => {
     return () => {

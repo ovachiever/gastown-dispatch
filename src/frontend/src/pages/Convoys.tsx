@@ -318,7 +318,7 @@ function SynthesisPanel({
 
 	// Simple tracking convoy (no synthesis needed)
 	if (!needsSynthesis) {
-		const allComplete = detail.total > 0 && detail.completed === detail.total;
+		const allComplete = (detail.total ?? 0) > 0 && detail.completed === detail.total;
 
 		return (
 			<div

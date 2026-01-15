@@ -18,6 +18,8 @@ import { getStatus, getConvoys, getBeads, startTown, shutdownTown } from "@/lib/
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo } from "react";
 import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
+import { WIPGauge } from "@/components/dashboard/WIPGauge";
+import { StallDetector, calculateStallItems } from "@/components/dashboard/StallDetector";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -930,8 +932,25 @@ export default function Overview() {
 			{/* Main dashboard area */}
 			<div className="flex-1 p-4 overflow-hidden">
 				<div className="h-full grid grid-cols-12 gap-4">
-					{/* Left panel - Alarms and Convoys */}
-					<div className="col-span-3 flex flex-col gap-4">
+					{/* Left panel - WIP Gauge, Stall Detector, Alarms and Convoys */}
+					<div className="col-span-3 flex flex-col gap-4 overflow-y-auto">
+						{/* WIP Gauge */}
+						<WIPGauge
+							activePolecats={status.rigs.flatMap(r => r.agents || []).filter(a => a.running && a.has_work).length}
+							activeHooks={status.summary.active_hooks}
+							inProgressSteps={beads.filter(b => b.status === "in_progress" || b.status === "hooked").length}
+						/>
+
+						{/* Stall Detector */}
+						<StallDetector
+							items={calculateStallItems(
+								status.rigs.flatMap(r => r.agents || []),
+								beads,
+								new Date()
+							)}
+							thresholdMs={30 * 60 * 1000}
+						/>
+
 						<AlarmPanel agents={status.agents} rigs={status.rigs} />
 
 						{/* Convoy batch monitor */}
