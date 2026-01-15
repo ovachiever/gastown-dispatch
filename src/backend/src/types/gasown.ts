@@ -221,6 +221,35 @@ export interface CrewAddRequest {
 	rig: string;
 }
 
+// Mail types
+export type MailPriority = "urgent" | "high" | "normal" | "low" | "backlog";
+export type MailType = "task" | "scavenge" | "notification" | "reply";
+
+export interface MailMessage {
+	id: string;
+	from: string;
+	to: string;
+	subject: string;
+	body: string;
+	timestamp: string;
+	read: boolean;
+	priority: MailPriority;
+	type: MailType;
+	thread_id: string;
+	cc?: string[];
+	reply_to?: string;
+}
+
+export interface MailInboxFilters {
+	address?: string;
+	unread?: boolean;
+}
+
+export interface MailThread {
+	thread_id: string;
+	messages: MailMessage[];
+}
+
 // Dispatch (Mayor chat) types
 export interface DispatchMessage {
 	id: string;
