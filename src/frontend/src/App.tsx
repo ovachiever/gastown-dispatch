@@ -9,6 +9,7 @@ import {
 	Settings,
 	Rocket,
 	HardDrive,
+	GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Overview from "@/pages/Overview";
@@ -20,12 +21,19 @@ import Logs from "@/pages/Logs";
 import SettingsPage from "@/pages/Settings";
 import Onboarding from "@/pages/Onboarding";
 import Rigs from "@/pages/Rigs";
+import Pipeline from "@/pages/Pipeline";
+import PipelineReviews from "@/pages/pipeline/Reviews";
+import PipelineMergeQueue from "@/pages/pipeline/MergeQueue";
+import PipelineTests from "@/pages/pipeline/Tests";
+import PipelineDeployments from "@/pages/pipeline/Deployments";
+import PipelineMonitoring from "@/pages/pipeline/Monitoring";
 
 const navItems = [
 	{ to: "/overview", icon: LayoutDashboard, label: "Overview" },
 	{ to: "/dispatch", icon: MessageSquare, label: "Mayor" },
 	{ to: "/convoys", icon: Truck, label: "Convoys" },
 	{ to: "/beads", icon: CircleDot, label: "Beads" },
+	{ to: "/pipeline", icon: GitBranch, label: "Pipeline" },
 	{ to: "/rigs", icon: HardDrive, label: "Rigs" },
 	{ to: "/agents", icon: Users, label: "Agents" },
 	{ to: "/logs", icon: ScrollText, label: "Logs" },
@@ -104,6 +112,13 @@ export default function App() {
 					<Route path="/dispatch" element={<DispatchTerminal />} />
 					<Route path="/convoys" element={<Convoys />} />
 					<Route path="/beads" element={<Beads />} />
+					<Route path="/pipeline" element={<Pipeline />}>
+						<Route path="reviews" element={<PipelineReviews />} />
+						<Route path="merge-queue" element={<PipelineMergeQueue />} />
+						<Route path="tests" element={<PipelineTests />} />
+						<Route path="deployments" element={<PipelineDeployments />} />
+						<Route path="monitoring" element={<PipelineMonitoring />} />
+					</Route>
 					<Route path="/rigs" element={<Rigs />} />
 					<Route path="/agents" element={<Agents />} />
 					<Route path="/logs" element={<Logs />} />
