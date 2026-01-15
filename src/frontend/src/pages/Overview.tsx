@@ -1001,7 +1001,7 @@ export default function Overview() {
 						<AlarmPanel agents={status.agents} rigs={status.rigs} />
 
 						{/* Convoy batch monitor */}
-						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden">
+						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden flex flex-col">
 							<div className="flex items-center gap-2 mb-3">
 								<Truck size={16} className="text-purple-400" />
 								<span className="text-sm font-semibold text-slate-200">Active Convoys</span>
@@ -1009,7 +1009,7 @@ export default function Overview() {
 									{convoys.length}
 								</span>
 							</div>
-							<div className="space-y-2 max-h-[calc(100%-2rem)] overflow-y-auto">
+							<div className="space-y-2 overflow-y-auto flex-1 min-h-0">
 								{convoys.length === 0 ? (
 									<div className="text-xs text-slate-500 text-center py-4">
 										No active convoys
