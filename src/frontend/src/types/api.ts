@@ -247,3 +247,31 @@ export interface MailInboxFilters {
 	priority?: MailPriority;
 	type?: MailType;
 }
+
+// Patrol (Deacon) types
+export type DeaconState = "running" | "paused" | "stopped" | "error";
+export type BootStatus = "booting" | "ready" | "failed" | "degraded";
+
+export interface DeaconHeartbeat {
+	timestamp: string;
+	state: DeaconState;
+	uptime_ms: number;
+	last_patrol?: string;
+	error?: string;
+}
+
+export interface PatrolPausedState {
+	paused: boolean;
+	paused_at?: string;
+	reason?: string;
+}
+
+export interface PatrolStatus {
+	heartbeat: DeaconHeartbeat | null;
+	boot: BootStatus | null;
+	deacon_state: DeaconState | null;
+	patrol_muted: boolean;
+	patrol_paused: PatrolPausedState | null;
+	degraded_mode: boolean;
+	operational_mode: "normal" | "degraded" | "offline";
+}
