@@ -44,14 +44,7 @@ import {
 	enableAllRigs,
 	disableAllRigs,
 } from "../services/rigs.js";
-import {
-	getPatrolStatus,
-	getDeaconHeartbeat,
-	getBootStatus,
-	getPatrolPausedState,
-	pausePatrol,
-	resumePatrol,
-} from "../services/patrol.js";
+import { getTelemetrySnapshot } from "../services/telemetry.js";
 import type {
 	ConvoyCreateRequest,
 	ConvoyCloseRequest,
@@ -86,6 +79,15 @@ router.get(
 	asyncHandler(async (req, res) => {
 		const status = await getTownStatus(getTownRoot(req));
 		res.json(status);
+	}),
+);
+
+// GET /api/telemetry/snapshot - Coherent snapshot of all lanes for Overview
+router.get(
+	"/telemetry/snapshot",
+	asyncHandler(async (req, res) => {
+		const snapshot = await getTelemetrySnapshot(getTownRoot(req));
+		res.json(snapshot);
 	}),
 );
 
@@ -492,73 +494,6 @@ router.post(
 	"/rigs/bulk/disable",
 	asyncHandler(async (req, res) => {
 		const result = await disableAllRigs(getTownRoot(req));
-		res.json(result);
-	}),
-);
-
-// =====================
-// Patrol (Watchdog Chain)
-// =====================
-
-router.get(
-	"/patrol",
-	asyncHandler(async (req, res) => {
-		const status = await getPatrolStatus(getTownRoot(req));
-		res.json(status);
-	}),
-);
-
-router.get(
-	"/patrol/heartbeat",
-	asyncHandler(async (req, res) => {
-		const heartbeat = await getDeaconHeartbeat(getTownRoot(req));
-		res.json(heartbeat);
-	}),
-);
-
-router.get(
-	"/patrol/boot",
-	asyncHandler(async (req, res) => {
-		const boot = await getBootStatus(getTownRoot(req));
-		res.json(boot);
-	}),
-);
-
-router.get(
-	"/patrol/mode",
-	asyncHandler(async (req, res) => {
-		const status = await getPatrolStatus(getTownRoot(req));
-		res.json({
-			operational_mode: status.operational_mode,
-			degraded_mode: status.degraded_mode,
-		});
-	}),
-);
-
-router.get(
-	"/patrol/muted",
-	asyncHandler(async (req, res) => {
-		const paused = await getPatrolPausedState(getTownRoot(req));
-		res.json({
-			muted: paused?.paused ?? false,
-			paused,
-		});
-	}),
-);
-
-router.post(
-	"/patrol/pause",
-	asyncHandler(async (req, res) => {
-		const { reason } = req.body;
-		const result = await pausePatrol(reason, getTownRoot(req));
-		res.json(result);
-	}),
-);
-
-router.post(
-	"/patrol/resume",
-	asyncHandler(async (req, res) => {
-		const result = await resumePatrol(getTownRoot(req));
 		res.json(result);
 	}),
 );

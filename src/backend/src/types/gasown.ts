@@ -254,46 +254,105 @@ export interface DispatchSession {
 	updated_at: string;
 }
 
-// Patrol (watchdog chain) types
-export interface DeaconHeartbeat {
+// Telemetry Snapshot types - single source of truth for Overview
+export interface TownTelemetrySnapshot {
 	timestamp: string;
-	cycle: number;
-	last_action: string;
-	healthy_agents: number;
-	unhealthy_agents: number;
-}
-
-export interface DeaconState {
-	patrol_count: number;
-	last_patrol: string;
-	extraordinary_action: boolean;
-}
-
-export interface BootStatus {
-	boot_dir: string;
-	degraded: boolean;
-	running: boolean;
-	session_alive: boolean;
-	last_status: {
-		running: boolean;
-		started_at: string;
-		completed_at: string;
+	town_name: string;
+	lanes: {
+		agents: AgentsLane;
+		work: WorkLane;
+		convoys: ConvoysLane;
+		system: SystemLane;
 	};
 }
 
-export interface PatrolPausedState {
-	paused: boolean;
-	reason: string;
-	paused_at: string;
-	paused_by: string;
+export interface AgentsLane {
+	summary: {
+		total: number;
+		running: number;
+		idle: number;
+		with_work: number;
+	};
+	top_items: AgentSnapshot[];
 }
 
-export interface PatrolStatus {
-	heartbeat: DeaconHeartbeat | null;
-	boot: BootStatus | null;
-	deacon_state: DeaconState | null;
-	patrol_muted: boolean;
-	patrol_paused: PatrolPausedState | null;
-	degraded_mode: boolean;
-	operational_mode: "normal" | "degraded" | "offline";
+export interface AgentSnapshot {
+	name: string;
+	role: string;
+	rig?: string;
+	running: boolean;
+	state?: string;
+	has_work: boolean;
+	work_id?: string;
+	work_title?: string;
+	unread_mail: number;
+}
+
+export interface WorkLane {
+	summary: {
+		ready: number;
+		in_progress: number;
+		blocked: number;
+		total_open: number;
+	};
+	top_items: WorkItem[];
+}
+
+export interface WorkItem {
+	id: string;
+	title: string;
+	status: string;
+	type: string;
+	priority: number;
+	assignee?: string;
+	worker?: string;
+}
+
+export interface ConvoysLane {
+	summary: {
+		open: number;
+		stranded: number;
+		synthesis_ready: number;
+	};
+	top_items: ConvoySnapshot[];
+}
+
+export interface ConvoySnapshot {
+	id: string;
+	title: string;
+	progress: string;
+	completed: number;
+	total: number;
+	is_stranded: boolean;
+	synthesis_ready: boolean;
+	active_workers: number;
+}
+
+export interface SystemLane {
+	health: "healthy" | "degraded" | "offline";
+	summary: {
+		rig_count: number;
+		polecat_count: number;
+		crew_count: number;
+		witness_count: number;
+		refinery_count: number;
+		active_hooks: number;
+	};
+	message_queue: {
+		pending: number;
+		in_flight: number;
+		blocked: number;
+		state: "idle" | "processing" | "blocked";
+	};
+	rigs: RigSnapshot[];
+}
+
+export interface RigSnapshot {
+	name: string;
+	polecat_count: number;
+	crew_count: number;
+	has_witness: boolean;
+	has_refinery: boolean;
+	mq_state?: "idle" | "processing" | "blocked";
+	hooks_active: number;
 }
