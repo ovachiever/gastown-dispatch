@@ -45,11 +45,13 @@ import {
 	disableAllRigs,
 } from "../services/rigs.js";
 import {
-	listMergeQueue,
-	getMergeRequestStatus,
-	getNextMergeRequest,
-	getMergeQueueSummary,
-} from "../services/mq.js";
+	getPatrolStatus,
+	getDeaconHeartbeat,
+	getBootStatus,
+	getPatrolPausedState,
+	pausePatrol,
+	resumePatrol,
+} from "../services/patrol.js";
 import type {
 	ConvoyCreateRequest,
 	ConvoyCloseRequest,
@@ -57,8 +59,6 @@ import type {
 	RigAddRequest,
 	CrewAddRequest,
 	BeadFilters,
-	MQListFilters,
-	MQNextOptions,
 } from "../types/gasown.js";
 
 const router = Router();
@@ -497,65 +497,69 @@ router.post(
 );
 
 // =====================
-// Merge Queue (MQ)
+// Patrol (Watchdog Chain)
 // =====================
 
 router.get(
-	"/mq/:rig/list",
+	"/patrol",
 	asyncHandler(async (req, res) => {
-		const filters: MQListFilters = {
-			status: req.query.status as string | undefined,
-			worker: req.query.worker as string | undefined,
-			epic: req.query.epic as string | undefined,
-			ready: req.query.ready === "true",
-		};
-		const queue = await listMergeQueue(
-			req.params.rig,
-			filters,
-			getTownRoot(req),
-		);
-		res.json(queue);
-	}),
-);
-
-router.get(
-	"/mq/:rig/next",
-	asyncHandler(async (req, res) => {
-		const options: MQNextOptions = {
-			strategy: req.query.strategy as "priority" | "fifo" | undefined,
-		};
-		const next = await getNextMergeRequest(
-			req.params.rig,
-			options,
-			getTownRoot(req),
-		);
-		res.json(next);
-	}),
-);
-
-router.get(
-	"/mq/:rig/summary",
-	asyncHandler(async (req, res) => {
-		const summary = await getMergeQueueSummary(
-			req.params.rig,
-			getTownRoot(req),
-		);
-		res.json(summary);
-	}),
-);
-
-router.get(
-	"/mq/status/:id",
-	asyncHandler(async (req, res) => {
-		const status = await getMergeRequestStatus(
-			req.params.id,
-			getTownRoot(req),
-		);
-		if (!status) {
-			res.status(404).json({ success: false, message: "Merge request not found" });
-			return;
-		}
+		const status = await getPatrolStatus(getTownRoot(req));
 		res.json(status);
+	}),
+);
+
+router.get(
+	"/patrol/heartbeat",
+	asyncHandler(async (req, res) => {
+		const heartbeat = await getDeaconHeartbeat(getTownRoot(req));
+		res.json(heartbeat);
+	}),
+);
+
+router.get(
+	"/patrol/boot",
+	asyncHandler(async (req, res) => {
+		const boot = await getBootStatus(getTownRoot(req));
+		res.json(boot);
+	}),
+);
+
+router.get(
+	"/patrol/mode",
+	asyncHandler(async (req, res) => {
+		const status = await getPatrolStatus(getTownRoot(req));
+		res.json({
+			operational_mode: status.operational_mode,
+			degraded_mode: status.degraded_mode,
+		});
+	}),
+);
+
+router.get(
+	"/patrol/muted",
+	asyncHandler(async (req, res) => {
+		const paused = await getPatrolPausedState(getTownRoot(req));
+		res.json({
+			muted: paused?.paused ?? false,
+			paused,
+		});
+	}),
+);
+
+router.post(
+	"/patrol/pause",
+	asyncHandler(async (req, res) => {
+		const { reason } = req.body;
+		const result = await pausePatrol(reason, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/patrol/resume",
+	asyncHandler(async (req, res) => {
+		const result = await resumePatrol(getTownRoot(req));
+		res.json(result);
 	}),
 );
 

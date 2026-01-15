@@ -254,59 +254,46 @@ export interface DispatchSession {
 	updated_at: string;
 }
 
-// Merge Queue types
-export interface MergeRequest {
-	id: string;
-	title: string;
-	description?: string;
-	status: string;
-	priority: number;
-	issue_type: string;
-	created_at: string;
-	updated_at: string;
-	closed_at?: string;
-	assignee?: string;
-	blocked_by?: string[];
-	blocked_by_count?: number;
-	labels?: string[];
+// Patrol (watchdog chain) types
+export interface DeaconHeartbeat {
+	timestamp: string;
+	cycle: number;
+	last_action: string;
+	healthy_agents: number;
+	unhealthy_agents: number;
 }
 
-export interface MRStatusOutput {
-	id: string;
-	title: string;
-	status: string;
-	priority: number;
-	type: string;
-	assignee?: string;
-	created_at: string;
-	updated_at: string;
-	closed_at?: string;
-	branch?: string;
-	target?: string;
-	source_issue?: string;
-	worker?: string;
-	rig?: string;
-	merge_commit?: string;
-	close_reason?: string;
-	depends_on?: MRDependencyInfo[];
-	blocks?: MRDependencyInfo[];
+export interface DeaconState {
+	patrol_count: number;
+	last_patrol: string;
+	extraordinary_action: boolean;
 }
 
-export interface MRDependencyInfo {
-	id: string;
-	title: string;
-	status: string;
-	priority: number;
-	type: string;
+export interface BootStatus {
+	boot_dir: string;
+	degraded: boolean;
+	running: boolean;
+	session_alive: boolean;
+	last_status: {
+		running: boolean;
+		started_at: string;
+		completed_at: string;
+	};
 }
 
-export interface MQListFilters {
-	status?: string;
-	worker?: string;
-	epic?: string;
-	ready?: boolean;
+export interface PatrolPausedState {
+	paused: boolean;
+	reason: string;
+	paused_at: string;
+	paused_by: string;
 }
 
-export interface MQNextOptions {
-	strategy?: "priority" | "fifo";
+export interface PatrolStatus {
+	heartbeat: DeaconHeartbeat | null;
+	boot: BootStatus | null;
+	deacon_state: DeaconState | null;
+	patrol_muted: boolean;
+	patrol_paused: PatrolPausedState | null;
+	degraded_mode: boolean;
+	operational_mode: "normal" | "degraded" | "offline";
 }
