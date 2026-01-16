@@ -153,6 +153,30 @@ export interface Bead {
 	created_at: string;
 	updated_at?: string;
 	created_by?: string;
+	dependency_count?: number;
+	dependent_count?: number;
+}
+
+export interface BeadDependency {
+	id: string;
+	title: string;
+	status: string;
+	type?: string;
+	priority?: number;
+	dependency_type: "blocks" | "tracks" | "parent-child" | "relates_to";
+}
+
+export interface BeadComment {
+	id: string;
+	author: string;
+	content: string;
+	created_at: string;
+}
+
+export interface BeadDetail extends Bead {
+	dependencies: BeadDependency[];
+	dependents: BeadDependency[];
+	comments: BeadComment[];
 }
 
 export interface BeadFilters {

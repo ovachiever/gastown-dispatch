@@ -5,6 +5,9 @@ import type {
 	StrandedConvoy,
 	SynthesisStatus,
 	Bead,
+	BeadDetail,
+	BeadComment,
+	BeadDependency,
 	ActionResult,
 	BeadFilters,
 	MergeQueueListResponse,
@@ -180,6 +183,77 @@ export async function closeBead(
 	return fetchJson<ActionResult>(`/beads/${encodeURIComponent(id)}/close`, {
 		method: "POST",
 		body: JSON.stringify({ reason }),
+	});
+}
+
+export async function getBeadDetail(id: string): Promise<BeadDetail> {
+	return fetchJson<BeadDetail>(`/beads/${encodeURIComponent(id)}/detail`);
+}
+
+export async function getBeadComments(id: string): Promise<BeadComment[]> {
+	return fetchJson<BeadComment[]>(`/beads/${encodeURIComponent(id)}/comments`);
+}
+
+export async function addBeadComment(
+	id: string,
+	content: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/beads/${encodeURIComponent(id)}/comments`, {
+		method: "POST",
+		body: JSON.stringify({ content }),
+	});
+}
+
+export async function getBeadDependencies(
+	id: string,
+): Promise<BeadDependency[]> {
+	return fetchJson<BeadDependency[]>(
+		`/beads/${encodeURIComponent(id)}/dependencies`,
+	);
+}
+
+export async function getBeadDependents(id: string): Promise<BeadDependency[]> {
+	return fetchJson<BeadDependency[]>(
+		`/beads/${encodeURIComponent(id)}/dependents`,
+	);
+}
+
+export async function addBeadDependency(
+	id: string,
+	dependsOnId: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/beads/${encodeURIComponent(id)}/dependencies`,
+		{
+			method: "POST",
+			body: JSON.stringify({ depends_on: dependsOnId }),
+		},
+	);
+}
+
+export async function removeBeadDependency(
+	id: string,
+	dependsOnId: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/beads/${encodeURIComponent(id)}/dependencies/${encodeURIComponent(dependsOnId)}`,
+		{ method: "DELETE" },
+	);
+}
+
+export async function updateBead(
+	id: string,
+	updates: {
+		title?: string;
+		description?: string;
+		priority?: number;
+		assignee?: string;
+		labels?: string[];
+	},
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/beads/${encodeURIComponent(id)}`, {
+		method: "PATCH",
+		body: JSON.stringify(updates),
 	});
 }
 

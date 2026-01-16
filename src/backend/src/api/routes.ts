@@ -24,6 +24,14 @@ import {
 	closeBead,
 	listRigBeads,
 	getAllRigBeads,
+	getBeadDetail,
+	getBeadComments,
+	addBeadComment,
+	getBeadDependencies,
+	getBeadDependents,
+	addBeadDependency,
+	removeBeadDependency,
+	updateBead,
 } from "../services/beads.js";
 import {
 	startTown,
@@ -305,6 +313,89 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const { reason } = req.body;
 		const result = await closeBead(req.params.id, reason, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.get(
+	"/beads/:id/detail",
+	asyncHandler(async (req, res) => {
+		const detail = await getBeadDetail(req.params.id, getTownRoot(req));
+		res.json(detail);
+	}),
+);
+
+router.get(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const comments = await getBeadComments(req.params.id, getTownRoot(req));
+		res.json(comments);
+	}),
+);
+
+router.post(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const { content } = req.body;
+		const result = await addBeadComment(
+			req.params.id,
+			content,
+			getTownRoot(req),
+		);
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
+router.get(
+	"/beads/:id/dependencies",
+	asyncHandler(async (req, res) => {
+		const deps = await getBeadDependencies(req.params.id, getTownRoot(req));
+		res.json(deps);
+	}),
+);
+
+router.get(
+	"/beads/:id/dependents",
+	asyncHandler(async (req, res) => {
+		const deps = await getBeadDependents(req.params.id, getTownRoot(req));
+		res.json(deps);
+	}),
+);
+
+router.post(
+	"/beads/:id/dependencies",
+	asyncHandler(async (req, res) => {
+		const { depends_on } = req.body;
+		const result = await addBeadDependency(
+			req.params.id,
+			depends_on,
+			getTownRoot(req),
+		);
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
+router.delete(
+	"/beads/:id/dependencies/:depId",
+	asyncHandler(async (req, res) => {
+		const result = await removeBeadDependency(
+			req.params.id,
+			req.params.depId,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.patch(
+	"/beads/:id",
+	asyncHandler(async (req, res) => {
+		const { title, description, priority, assignee, labels } = req.body;
+		const result = await updateBead(
+			req.params.id,
+			{ title, description, priority, assignee, labels },
+			getTownRoot(req),
+		);
 		res.json(result);
 	}),
 );
