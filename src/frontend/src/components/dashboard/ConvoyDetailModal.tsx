@@ -11,7 +11,7 @@ import {
 	Beaker,
 	Timer,
 	Loader2,
-	Maximize2,
+	Plus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -423,27 +423,15 @@ export function ConvoyDetailModal({ convoyId, onClose }: ConvoyDetailModalProps)
 						)}
 					</div>
 					<div className="flex items-center gap-2">
-						{canClose && (
+						{detail?.status === "open" && (
 							<button
-								onClick={() => setShowCloseConfirm(true)}
-								disabled={closeMutation.isPending}
-								className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white font-medium transition-colors disabled:opacity-50"
+								onClick={handleExpandToFullPage}
+								className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition-colors"
 							>
-								{closeMutation.isPending ? (
-									<Loader2 className="animate-spin" size={12} />
-								) : (
-									<CheckCircle2 size={12} />
-								)}
-								Close Convoy
+								<Plus size={12} />
+								Add Issues
 							</button>
 						)}
-						<button
-							onClick={handleExpandToFullPage}
-							className="p-1.5 rounded hover:bg-slate-800 transition-colors"
-							title="Open full page"
-						>
-							<Maximize2 size={14} className="text-slate-400 hover:text-slate-200" />
-						</button>
 						<button
 							onClick={onClose}
 							className="p-1.5 rounded hover:bg-slate-800 transition-colors"
@@ -567,6 +555,67 @@ export function ConvoyDetailModal({ convoyId, onClose }: ConvoyDetailModalProps)
 								onStartSynthesis={() => synthesisMutation.mutate()}
 								isStarting={synthesisMutation.isPending}
 							/>
+
+							{/* Tracking Panel (for simple tracking convoys - shows Close when ready) */}
+							{!needsSynthesis && detail.status === "open" && (
+								<div
+									className={cn(
+										"rounded-lg p-3 border",
+										canClose
+											? "bg-green-900/20 border-green-500/50"
+											: "bg-slate-800 border-slate-700"
+									)}
+								>
+									<div className="flex items-center justify-between mb-2">
+										<div className="flex items-center gap-2">
+											<Truck
+												size={16}
+												className={canClose ? "text-green-400" : "text-slate-400"}
+											/>
+											<h3
+												className={cn(
+													"font-medium text-sm",
+													canClose ? "text-green-300" : "text-slate-200"
+												)}
+											>
+												Tracking Convoy
+											</h3>
+										</div>
+										{canClose && (
+											<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-300">
+												<CheckCircle2 size={12} />
+												Complete
+											</span>
+										)}
+									</div>
+
+									{canClose ? (
+										<>
+											<p className="text-xs text-green-200/70 mb-2">
+												All tracked issues are complete. You can now close this convoy.
+											</p>
+											<button
+												onClick={() => setShowCloseConfirm(true)}
+												disabled={closeMutation.isPending}
+												className="flex items-center gap-2 px-3 py-1.5 rounded bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+											>
+												{closeMutation.isPending ? (
+													<Loader2 className="animate-spin" size={14} />
+												) : (
+													<CheckCircle2 size={14} />
+												)}
+												Close Convoy
+											</button>
+										</>
+									) : (
+										<>
+											<p className="text-xs text-slate-400">
+												{completed} of {total} issues complete
+											</p>
+										</>
+									)}
+								</div>
+							)}
 
 							{/* Tracked Issues */}
 							<div>
