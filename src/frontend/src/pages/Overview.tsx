@@ -563,6 +563,12 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 		return () => clearInterval(timer);
 	}, []);
 
+	// Count active rigs (those with at least one running agent)
+	const activeRigCount = status?.rigs?.filter(rig =>
+		rig.agents?.some(agent => agent.running)
+	).length ?? 0;
+	const totalRigCount = status?.summary.rig_count ?? 0;
+
 	return (
 		<div className="bg-slate-900 border-b border-slate-700 px-4 py-2">
 			<div className="flex items-center justify-between">
@@ -595,7 +601,7 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 				<div className="flex items-center gap-4">
 					<div className="flex items-center gap-1 text-sm">
 						<Server size={14} className="text-blue-400" />
-						<span className="font-mono text-slate-300">{status?.summary.rig_count || 0}</span>
+						<span className="font-mono text-slate-300">{activeRigCount}/{totalRigCount}</span>
 						<span className="text-slate-500 text-xs">RIGS</span>
 					</div>
 					<div className="flex items-center gap-1 text-sm">
