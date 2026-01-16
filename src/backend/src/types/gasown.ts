@@ -453,3 +453,54 @@ export interface PatrolStatus {
 	degraded_mode: boolean;
 	operational_mode: "normal" | "degraded" | "offline";
 }
+
+// Enhanced agent types for agent API endpoints
+export interface AgentDetail extends AgentRuntime {
+	mail_count: number;
+	mail_preview?: MailPreview[];
+	work_details?: WorkDetails;
+}
+
+export interface MailPreview {
+	id: string;
+	from: string;
+	subject: string;
+	timestamp: string;
+	read: boolean;
+}
+
+export interface WorkDetails {
+	bead_id?: string;
+	title?: string;
+	branch?: string;
+	worktree?: string;
+	started_at?: string;
+}
+
+// Polecat status from gt polecat status/list
+export interface PolecatStatus {
+	name: string;
+	rig: string;
+	address: string;
+	state: "working" | "done" | "stuck" | "idle";
+	session_running: boolean;
+	has_work: boolean;
+	work_id?: string;
+	work_title?: string;
+	branch?: string;
+	worktree?: string;
+	created_at?: string;
+	last_activity?: string;
+}
+
+// Rig detail with polecats for /rigs/:name/polecats endpoint
+export interface RigDetail {
+	name: string;
+	path: string;
+	enabled: boolean;
+	has_witness: boolean;
+	has_refinery: boolean;
+	polecat_count: number;
+	crew_count: number;
+	polecats: PolecatStatus[];
+}

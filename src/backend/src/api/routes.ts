@@ -47,6 +47,15 @@ import {
 	disableAllRigs,
 } from "../services/rigs.js";
 import {
+	listAgents,
+	getAgentDetail,
+	getAgentMail,
+	peekAgent,
+	nudgeAgent as nudgeAgentService,
+	listPolecats,
+	getPolecatStatus,
+} from "../services/agents.js";
+import {
 	getMergeQueueList,
 	getNextMergeRequest,
 	getMergeRequestStatus,
@@ -659,6 +668,124 @@ router.post(
 	"/patrol/resume",
 	asyncHandler(async (req, res) => {
 		const result = await resumePatrol(getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+// =====================
+// Agents
+// =====================
+
+router.get(
+	"/agents",
+	asyncHandler(async (req, res) => {
+		const agents = await listAgents(getTownRoot(req));
+		res.json(agents);
+	}),
+);
+
+// Agent address can contain slashes (e.g., "rig/polecat"), so use wildcard
+// Static routes for specific actions must come before the wildcard
+
+router.get(
+	"/agents/:address(*)/mail",
+	asyncHandler(async (req, res) => {
+		const address = req.params.address;
+		const mail = await getAgentMail(address, getTownRoot(req));
+		res.json(mail);
+	}),
+);
+
+router.get(
+	"/agents/:address(*)/peek",
+	asyncHandler(async (req, res) => {
+		const address = req.params.address;
+		const lines = req.query.lines ? parseInt(req.query.lines as string, 10) : 100;
+		const output = await peekAgent(address, lines, getTownRoot(req));
+		res.json(output);
+	}),
+);
+
+router.post(
+	"/agents/:address(*)/nudge",
+	asyncHandler(async (req, res) => {
+		const address = req.params.address;
+		const { message } = req.body as { message: string };
+		const result = await nudgeAgentService(address, message, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.get(
+	"/agents/:address(*)",
+	asyncHandler(async (req, res) => {
+		const address = req.params.address;
+		const agent = await getAgentDetail(address, getTownRoot(req));
+		if (!agent) {
+			res.status(404).json({ success: false, message: "Agent not found" });
+			return;
+		}
+		res.json(agent);
+	}),
+);
+
+// =====================
+// Rig Polecats (RESTful)
+// =====================
+
+router.get(
+	"/rigs/:rigName/polecats",
+	asyncHandler(async (req, res) => {
+		const polecats = await listPolecats(req.params.rigName, getTownRoot(req));
+		res.json(polecats);
+	}),
+);
+
+router.post(
+	"/rigs/:rigName/polecats",
+	asyncHandler(async (req, res) => {
+		const { name } = req.body as { name: string };
+		const result = await addPolecat(req.params.rigName, name, getTownRoot(req));
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
+router.get(
+	"/rigs/:rigName/polecats/:polecatName",
+	asyncHandler(async (req, res) => {
+		const polecat = await getPolecatStatus(
+			req.params.rigName,
+			req.params.polecatName,
+			getTownRoot(req),
+		);
+		if (!polecat) {
+			res.status(404).json({ success: false, message: "Polecat not found" });
+			return;
+		}
+		res.json(polecat);
+	}),
+);
+
+router.delete(
+	"/rigs/:rigName/polecats/:polecatName",
+	asyncHandler(async (req, res) => {
+		const result = await removePolecat(
+			req.params.rigName,
+			req.params.polecatName,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/rigs/:rigName/polecats/:polecatName/nuke",
+	asyncHandler(async (req, res) => {
+		const result = await nukePolecat(
+			req.params.rigName,
+			req.params.polecatName,
+			getTownRoot(req),
+		);
 		res.json(result);
 	}),
 );
