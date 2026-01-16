@@ -22,6 +22,8 @@ import {
 	createBead,
 	updateBeadStatus,
 	closeBead,
+	updateBead,
+	deleteBead,
 	listRigBeads,
 	getAllRigBeads,
 } from "../services/beads.js";
@@ -305,6 +307,27 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const { reason } = req.body;
 		const result = await closeBead(req.params.id, reason, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.patch(
+	"/beads/:id",
+	asyncHandler(async (req, res) => {
+		const { priority, assignee, title, description, type } = req.body;
+		const result = await updateBead(
+			req.params.id,
+			{ priority, assignee, title, description, type },
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.delete(
+	"/beads/:id",
+	asyncHandler(async (req, res) => {
+		const result = await deleteBead(req.params.id, getTownRoot(req));
 		res.json(result);
 	}),
 );

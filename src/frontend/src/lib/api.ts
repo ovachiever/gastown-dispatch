@@ -183,6 +183,28 @@ export async function closeBead(
 	});
 }
 
+export async function updateBead(
+	id: string,
+	updates: {
+		priority?: number;
+		assignee?: string;
+		title?: string;
+		description?: string;
+		type?: string;
+	},
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/beads/${encodeURIComponent(id)}`, {
+		method: "PATCH",
+		body: JSON.stringify(updates),
+	});
+}
+
+export async function deleteBead(id: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>(`/beads/${encodeURIComponent(id)}`, {
+		method: "DELETE",
+	});
+}
+
 // Actions
 export async function startTown(): Promise<ActionResult> {
 	return fetchJson<ActionResult>("/actions/start", { method: "POST" });

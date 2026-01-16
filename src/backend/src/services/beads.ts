@@ -144,6 +144,72 @@ export async function closeBead(
 	};
 }
 
+export async function updateBead(
+	beadId: string,
+	updates: {
+		priority?: number;
+		assignee?: string;
+		title?: string;
+		description?: string;
+		type?: string;
+	},
+	townRoot?: string,
+): Promise<ActionResult> {
+	const args = ["update", beadId];
+
+	if (updates.priority !== undefined) {
+		args.push(`--priority=${updates.priority}`);
+	}
+	if (updates.assignee !== undefined) {
+		// Empty string means unassign
+		args.push(`--assignee=${updates.assignee}`);
+	}
+	if (updates.title) {
+		args.push(`--title=${updates.title}`);
+	}
+	if (updates.description !== undefined) {
+		args.push(`--description=${updates.description}`);
+	}
+	if (updates.type) {
+		args.push(`--type=${updates.type}`);
+	}
+
+	const result = await runBd(args, { cwd: townRoot });
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to update bead",
+			error: result.stderr,
+		};
+	}
+
+	return {
+		success: true,
+		message: `Updated bead: ${beadId}`,
+	};
+}
+
+export async function deleteBead(
+	beadId: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runBd(["delete", beadId, "--force"], { cwd: townRoot });
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to delete bead",
+			error: result.stderr,
+		};
+	}
+
+	return {
+		success: true,
+		message: `Deleted bead: ${beadId}`,
+	};
+}
+
 export async function listRigBeads(
 	rigName: string,
 	filters: BeadFilters = {},

@@ -15,7 +15,9 @@ import {
   AlertCircle,
   Pause,
   Play,
-  Edit,
+  Trash2,
+  ChevronDown,
+  UserMinus,
 } from "lucide-react";
 import {
   getBeads,
@@ -24,6 +26,8 @@ import {
   createBead,
   updateBeadStatus,
   closeBead,
+  updateBead,
+  deleteBead,
 } from "@/lib/api";
 import {
   cn,
@@ -294,6 +298,10 @@ export default function Beads() {
               error={beadError}
               onClose={() => setSelectedBeadId(null)}
               onRefresh={() => queryClient.invalidateQueries({ queryKey: ["bead", selectedBeadId] })}
+              onDeleted={() => {
+                setSelectedBeadId(null);
+                refetch();
+              }}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gt-muted">
@@ -323,14 +331,21 @@ function BeadDetail({
   error,
   onClose,
   onRefresh,
+  onDeleted,
 }: {
   bead: Bead | undefined;
   isLoading: boolean;
   error: Error | null;
   onClose: () => void;
   onRefresh: () => void;
+  onDeleted: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -347,6 +362,28 @@ function BeadDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beads"] });
       onRefresh();
+      setShowCloseConfirm(false);
+      setCloseReason("");
+    },
+  });
+
+  const updateBeadMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { priority?: number; assignee?: string } }) =>
+      updateBead(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["beads"] });
+      onRefresh();
+      setShowPriorityDropdown(false);
+      setShowAssigneeDropdown(false);
+    },
+  });
+
+  const deleteBeadMutation = useMutation({
+    mutationFn: (id: string) => deleteBead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["beads"] });
+      setShowDeleteConfirm(false);
+      onDeleted();
     },
   });
 
@@ -391,6 +428,13 @@ function BeadDetail({
     }
   };
 
+  const priorities = [
+    { value: 1, label: "P1 - Critical", color: "text-red-400" },
+    { value: 2, label: "P2 - High", color: "text-orange-400" },
+    { value: 3, label: "P3 - Normal", color: "text-yellow-400" },
+    { value: 4, label: "P4 - Low", color: "text-gt-muted" },
+  ];
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -403,9 +447,42 @@ function BeadDetail({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-gt-muted">{bead.id}</span>
-                <span className={cn("text-xs font-medium uppercase px-2 py-0.5 rounded-full", getPriorityColor(bead.priority))}>
-                  {getPriorityLabel(bead.priority)}
-                </span>
+                {/* Priority Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                    className={cn(
+                      "text-xs font-medium uppercase px-2 py-0.5 rounded-full flex items-center gap-1 hover:opacity-80 transition-opacity",
+                      getPriorityColor(bead.priority)
+                    )}
+                  >
+                    {getPriorityLabel(bead.priority)}
+                    <ChevronDown size={12} />
+                  </button>
+                  {showPriorityDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-gt-surface border border-gt-border rounded-lg shadow-lg z-10 min-w-[140px]">
+                      {priorities.map((p) => (
+                        <button
+                          key={p.value}
+                          onClick={() => {
+                            updateBeadMutation.mutate({
+                              id: bead.id,
+                              updates: { priority: p.value },
+                            });
+                          }}
+                          disabled={updateBeadMutation.isPending}
+                          className={cn(
+                            "w-full px-3 py-2 text-left text-sm hover:bg-gt-border transition-colors first:rounded-t-lg last:rounded-b-lg",
+                            p.color,
+                            bead.priority === p.value && "bg-gt-border"
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <span className="text-xs uppercase px-2 py-0.5 rounded-full bg-gt-border">
                   {bead.type}
                 </span>
@@ -422,7 +499,7 @@ function BeadDetail({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {bead.status !== "closed" && (
             <>
               {bead.status === "open" && (
@@ -455,19 +532,59 @@ function BeadDetail({
                   Pause
                 </button>
               )}
-              <button
-                onClick={() =>
-                  closeBeadMutation.mutate({
-                    id: bead.id,
-                    reason: "Completed",
-                  })
-                }
-                disabled={closeBeadMutation.isPending}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle2 size={14} />
-                Close
-              </button>
+              {/* Close Button with Confirmation */}
+              {!showCloseConfirm ? (
+                <button
+                  onClick={() => setShowCloseConfirm(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors"
+                >
+                  <CheckCircle2 size={14} />
+                  Close
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 bg-gt-surface border border-gt-border rounded-lg p-2">
+                  <input
+                    type="text"
+                    value={closeReason}
+                    onChange={(e) => setCloseReason(e.target.value)}
+                    placeholder="Reason (optional)"
+                    className="px-2 py-1 text-sm bg-gt-background border border-gt-border rounded focus:outline-none focus:ring-1 focus:ring-gt-accent w-40"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        closeBeadMutation.mutate({
+                          id: bead.id,
+                          reason: closeReason || "Completed",
+                        });
+                      } else if (e.key === "Escape") {
+                        setShowCloseConfirm(false);
+                        setCloseReason("");
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() =>
+                      closeBeadMutation.mutate({
+                        id: bead.id,
+                        reason: closeReason || "Completed",
+                      })
+                    }
+                    disabled={closeBeadMutation.isPending}
+                    className="px-2 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {closeBeadMutation.isPending ? "..." : "Confirm"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCloseConfirm(false);
+                      setCloseReason("");
+                    }}
+                    className="px-2 py-1 text-sm rounded hover:bg-gt-border transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </>
           )}
           {bead.status === "closed" && (
@@ -485,10 +602,33 @@ function BeadDetail({
               Reopen
             </button>
           )}
-          <button className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-gt-surface hover:bg-gt-border transition-colors">
-            <Edit size={14} />
-            Edit
-          </button>
+          {/* Delete Button */}
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-red-900/20 border border-red-500 rounded-lg p-2">
+              <span className="text-sm text-red-400">Delete this bead?</span>
+              <button
+                onClick={() => deleteBeadMutation.mutate(bead.id)}
+                disabled={deleteBeadMutation.isPending}
+                className="px-2 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleteBeadMutation.isPending ? "..." : "Yes, Delete"}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-2 py-1 text-sm rounded hover:bg-gt-border transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -526,9 +666,48 @@ function BeadDetail({
             <h3 className="text-sm font-semibold text-gt-muted uppercase mb-2">
               Assignee
             </h3>
-            <div className="flex items-center gap-2">
-              <User size={16} className="text-gt-muted" />
-              <span>{bead.assignee || "Unassigned"}</span>
+            {/* Assignee Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                className="flex items-center gap-2 hover:text-gt-accent transition-colors"
+              >
+                <User size={16} className="text-gt-muted" />
+                <span>{bead.assignee || "Unassigned"}</span>
+                <ChevronDown size={14} className="text-gt-muted" />
+              </button>
+              {showAssigneeDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-gt-surface border border-gt-border rounded-lg shadow-lg z-10 min-w-[160px]">
+                  <button
+                    onClick={() => {
+                      updateBeadMutation.mutate({
+                        id: bead.id,
+                        updates: { assignee: "erik" },
+                      });
+                    }}
+                    disabled={updateBeadMutation.isPending}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gt-border transition-colors flex items-center gap-2 rounded-t-lg"
+                  >
+                    <User size={14} />
+                    Assign to me
+                  </button>
+                  {bead.assignee && (
+                    <button
+                      onClick={() => {
+                        updateBeadMutation.mutate({
+                          id: bead.id,
+                          updates: { assignee: "" },
+                        });
+                      }}
+                      disabled={updateBeadMutation.isPending}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gt-border transition-colors flex items-center gap-2 text-red-400 rounded-b-lg"
+                    >
+                      <UserMinus size={14} />
+                      Unassign
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div>
