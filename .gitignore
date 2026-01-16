@@ -93,3 +93,4 @@ coverage/
 # Keep gastown as reference but don't include in our commits
 # (it's a separate repo with its own .git)
 gastown/
+state.json
