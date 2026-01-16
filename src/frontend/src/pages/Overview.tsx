@@ -20,6 +20,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
 import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsSparklines";
 import { MayorDispatchModal } from "@/components/MayorDispatchModal";
+import { DeaconStatusPopup } from "@/components/dashboard/DeaconStatusPopup";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -666,6 +667,7 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 
 // Industrial control room visualization
 function AgentFlow({ agents, rigs, onMayorClick }: { agents: AgentRuntime[]; rigs: RigStatus[]; onMayorClick?: () => void }) {
+	const [showDeaconPopup, setShowDeaconPopup] = useState(false);
 	const mayor = agents.find(a => a.name === "mayor");
 	const deacon = agents.find(a => a.name === "deacon");
 
@@ -754,14 +756,18 @@ function AgentFlow({ agents, rigs, onMayorClick }: { agents: AgentRuntime[]; rig
 					</svg>
 				</div>
 
-				{/* Deacon - Supervisor Station */}
+				{/* Deacon - Supervisor Station (Clickable) */}
 				<div className="flex flex-col items-center flex-shrink-0">
-					<div className={cn(
-						"relative w-14 h-14 rounded border-2 flex items-center justify-center",
-						getDeaconStatus() === "active" ? "border-green-500 bg-gradient-to-b from-green-900/40 to-slate-900" :
-						getDeaconStatus() === "idle" ? "border-yellow-500 bg-gradient-to-b from-yellow-900/40 to-slate-900" :
-						"border-slate-600 bg-slate-800"
-					)}>
+					<button
+						onClick={() => setShowDeaconPopup(true)}
+						className={cn(
+							"relative w-14 h-14 rounded border-2 flex items-center justify-center cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
+							getDeaconStatus() === "active" ? "border-green-500 bg-gradient-to-b from-green-900/40 to-slate-900 hover:border-green-400 hover:shadow-green-500/20" :
+							getDeaconStatus() === "idle" ? "border-yellow-500 bg-gradient-to-b from-yellow-900/40 to-slate-900 hover:border-yellow-400 hover:shadow-yellow-500/20" :
+							"border-slate-600 bg-slate-800 hover:border-slate-500"
+						)}
+						title="Click to view Deacon health and patrol status"
+					>
 						<div className="text-center">
 							<Server size={16} className={cn(
 								getDeaconStatus() === "active" ? "text-green-400" :
@@ -774,8 +780,13 @@ function AgentFlow({ agents, rigs, onMayorClick }: { agents: AgentRuntime[]; rig
 							getDeaconStatus() === "active" ? "bg-green-400 animate-pulse" :
 							getDeaconStatus() === "idle" ? "bg-yellow-400" : "bg-slate-600"
 						)} />
-					</div>
+					</button>
 				</div>
+
+				{/* Deacon Status Popup */}
+				{showDeaconPopup && (
+					<DeaconStatusPopup onClose={() => setShowDeaconPopup(false)} />
+				)}
 
 				{/* Connection to Rigs */}
 				<div className="flex-1 relative h-6 min-w-8">

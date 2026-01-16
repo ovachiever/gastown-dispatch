@@ -12,6 +12,7 @@ import type {
 	MailMessage,
 	MailInbox,
 	MailInboxFilters,
+	PatrolStatus,
 } from "@/types/api";
 
 const API_BASE = "/api";
@@ -347,6 +348,24 @@ export async function markMailUnread(id: string): Promise<ActionResult> {
 
 export async function archiveMail(id: string): Promise<ActionResult> {
 	return fetchJson<ActionResult>(`/mail/${encodeURIComponent(id)}/archive`, {
+		method: "POST",
+	});
+}
+
+// Patrol (Deacon Status)
+export async function getPatrolStatus(): Promise<PatrolStatus> {
+	return fetchJson<PatrolStatus>("/patrol/status");
+}
+
+export async function pausePatrol(reason?: string): Promise<ActionResult> {
+	return fetchJson<ActionResult>("/patrol/pause", {
+		method: "POST",
+		body: JSON.stringify({ reason }),
+	});
+}
+
+export async function resumePatrol(): Promise<ActionResult> {
+	return fetchJson<ActionResult>("/patrol/resume", {
 		method: "POST",
 	});
 }

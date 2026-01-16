@@ -13,6 +13,7 @@ import {
 	startSynthesis,
 	removeFromConvoy,
 } from "../services/convoys.js";
+import { getPatrolStatus, pausePatrol, resumePatrol } from "../services/patrol.js";
 import {
 	listBeads,
 	getReadyBeads,
@@ -630,6 +631,35 @@ router.post(
 		// Archive - invalidate cache
 		invalidateMailCache();
 		res.json({ success: true, message: "Archived" });
+	}),
+);
+
+// =====================
+// Patrol (Deacon Status)
+// =====================
+
+router.get(
+	"/patrol/status",
+	asyncHandler(async (req, res) => {
+		const status = await getPatrolStatus(getTownRoot(req));
+		res.json(status);
+	}),
+);
+
+router.post(
+	"/patrol/pause",
+	asyncHandler(async (req, res) => {
+		const { reason } = req.body as { reason?: string };
+		const result = await pausePatrol(reason, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/patrol/resume",
+	asyncHandler(async (req, res) => {
+		const result = await resumePatrol(getTownRoot(req));
+		res.json(result);
 	}),
 );
 
