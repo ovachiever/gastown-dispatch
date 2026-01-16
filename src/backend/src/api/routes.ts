@@ -24,6 +24,14 @@ import {
 	closeBead,
 	listRigBeads,
 	getAllRigBeads,
+	getBeadDetail,
+	getBeadDependencies,
+	addBeadDependency,
+	removeBeadDependency,
+	getBeadComments,
+	addBeadComment,
+	updateBead,
+	assignBead,
 } from "../services/beads.js";
 import {
 	startTown,
@@ -60,6 +68,10 @@ import type {
 	RigAddRequest,
 	CrewAddRequest,
 	BeadFilters,
+	AddDependencyRequest,
+	AddCommentRequest,
+	UpdateBeadRequest,
+	AssignBeadRequest,
 } from "../types/gasown.js";
 
 const router = Router();
@@ -274,6 +286,69 @@ router.get(
 	}),
 );
 
+router.get(
+	"/beads/:id/detail",
+	asyncHandler(async (req, res) => {
+		const detail = await getBeadDetail(req.params.id, getTownRoot(req));
+		res.json(detail);
+	}),
+);
+
+router.get(
+	"/beads/:id/deps",
+	asyncHandler(async (req, res) => {
+		const deps = await getBeadDependencies(req.params.id, getTownRoot(req));
+		res.json(deps);
+	}),
+);
+
+router.post(
+	"/beads/:id/deps",
+	asyncHandler(async (req, res) => {
+		const { depends_on_id, type } = req.body as AddDependencyRequest;
+		const result = await addBeadDependency(
+			req.params.id,
+			depends_on_id,
+			type,
+			getTownRoot(req),
+		);
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
+router.delete(
+	"/beads/:id/deps/:depId",
+	asyncHandler(async (req, res) => {
+		const result = await removeBeadDependency(
+			req.params.id,
+			req.params.depId,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.get(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const comments = await getBeadComments(req.params.id, getTownRoot(req));
+		res.json(comments);
+	}),
+);
+
+router.post(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const { content } = req.body as AddCommentRequest;
+		const result = await addBeadComment(
+			req.params.id,
+			content,
+			getTownRoot(req),
+		);
+		res.status(result.success ? 201 : 400).json(result);
+	}),
+);
+
 router.post(
 	"/beads",
 	asyncHandler(async (req, res) => {
@@ -287,6 +362,15 @@ router.post(
 	}),
 );
 
+router.put(
+	"/beads/:id",
+	asyncHandler(async (req, res) => {
+		const updates = req.body as UpdateBeadRequest;
+		const result = await updateBead(req.params.id, updates, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
 router.patch(
 	"/beads/:id/status",
 	asyncHandler(async (req, res) => {
@@ -296,6 +380,15 @@ router.patch(
 			status,
 			getTownRoot(req),
 		);
+		res.json(result);
+	}),
+);
+
+router.post(
+	"/beads/:id/assign",
+	asyncHandler(async (req, res) => {
+		const { assignee } = req.body as AssignBeadRequest;
+		const result = await assignBead(req.params.id, assignee, getTownRoot(req));
 		res.json(result);
 	}),
 );

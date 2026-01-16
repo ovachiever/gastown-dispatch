@@ -163,6 +163,55 @@ export interface BeadFilters {
 	limit?: number;
 }
 
+// Enhanced bead types for detail view
+export interface DependencyInfo {
+	id: string;
+	title: string;
+	status: string;
+	issue_type?: string;
+	priority?: number;
+	dependency_type: string;
+	direction: "blocks" | "blocked_by";
+}
+
+export interface BeadComment {
+	id: number;
+	issue_id: string;
+	author: string;
+	text: string;
+	created_at: string;
+}
+
+export interface BeadDetail extends Bead {
+	blocks: DependencyInfo[];
+	blocked_by: DependencyInfo[];
+	comments: BeadComment[];
+}
+
+export interface AddDependencyRequest {
+	depends_on_id: string;
+	type?: string;
+}
+
+export interface AddCommentRequest {
+	content: string;
+}
+
+export interface UpdateBeadRequest {
+	title?: string;
+	description?: string;
+	status?: string;
+	type?: string;
+	priority?: number;
+	assignee?: string;
+	labels?: string[];
+	parent?: string;
+}
+
+export interface AssignBeadRequest {
+	assignee: string;
+}
+
 // Agent types
 export interface Agent {
 	name: string;
