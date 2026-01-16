@@ -1,6 +1,9 @@
-import { Truck, ExternalLink, AlertTriangle, Users, Clock } from "lucide-react";
+import { useState } from "react";
+import { Truck, ExternalLink, AlertTriangle, Users, Clock, CheckCircle2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn, calculateConvoyETA, type ConvoyETA } from "@/lib/utils";
+import { closeConvoy } from "@/lib/api";
 import type { Convoy, TrackedIssue } from "@/types/api";
 
 interface ConvoyPanelProps {
@@ -12,6 +15,8 @@ interface ConvoyDashboardCardProps {
 	convoy: Convoy;
 	eta: ConvoyETA;
 	onClick: () => void;
+	onClose: () => void;
+	isClosing: boolean;
 }
 
 // ETA badge with confidence-based coloring
@@ -144,10 +149,16 @@ function WorkerSummary({ issues }: { issues?: TrackedIssue[] }) {
 }
 
 // Individual convoy card
-function ConvoyDashboardCard({ convoy, eta, onClick }: ConvoyDashboardCardProps) {
+function ConvoyDashboardCard({ convoy, eta, onClick, onClose, isClosing }: ConvoyDashboardCardProps) {
 	const completed = convoy.completed || 0;
 	const total = convoy.total || 1;
 	const progress = Math.round((completed / total) * 100);
+	const isSynthesisReady = convoy.completed === convoy.total && (convoy.total || 0) > 0;
+
+	const handleClose = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		onClose();
+	};
 
 	return (
 		<div
@@ -155,7 +166,7 @@ function ConvoyDashboardCard({ convoy, eta, onClick }: ConvoyDashboardCardProps)
 			className={cn(
 				"bg-slate-900/60 border rounded p-2 cursor-pointer transition-all",
 				"hover:bg-slate-800/60 hover:border-slate-600",
-				eta.isBlocked ? "border-amber-700/50" : "border-slate-700"
+				isSynthesisReady ? "border-green-700/50" : eta.isBlocked ? "border-amber-700/50" : "border-slate-700"
 			)}
 		>
 			{/* Header: Title + ETA */}
@@ -182,7 +193,7 @@ function ConvoyDashboardCard({ convoy, eta, onClick }: ConvoyDashboardCardProps)
 				<SegmentedProgress issues={convoy.tracked_issues} total={total} />
 			</div>
 
-			{/* Footer: Progress text + Workers */}
+			{/* Footer: Progress text + Workers + Close button */}
 			<div className="flex items-center justify-between">
 				<WorkerSummary issues={convoy.tracked_issues} />
 				<div className="flex items-center gap-2">
@@ -195,6 +206,20 @@ function ConvoyDashboardCard({ convoy, eta, onClick }: ConvoyDashboardCardProps)
 						{completed}/{total}
 						<span className="text-slate-600 ml-1">({progress}%)</span>
 					</span>
+					{isSynthesisReady && (
+						<button
+							onClick={handleClose}
+							disabled={isClosing}
+							className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+						>
+							{isClosing ? (
+								<Loader2 size={10} className="animate-spin" />
+							) : (
+								<CheckCircle2 size={10} />
+							)}
+							Close
+						</button>
+					)}
 				</div>
 			</div>
 		</div>
@@ -233,6 +258,8 @@ function ConvoySummary({ convoys, etas }: { convoys: Convoy[]; etas: ConvoyETA[]
 
 export function ConvoyPanel({ convoys, sseConnected }: ConvoyPanelProps) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+	const [closingConvoyId, setClosingConvoyId] = useState<string | null>(null);
 
 	// Calculate ETA for each convoy
 	const etas = convoys.map((convoy) =>
@@ -247,8 +274,24 @@ export function ConvoyPanel({ convoys, sseConnected }: ConvoyPanelProps) {
 		})
 	);
 
+	const closeMutation = useMutation({
+		mutationFn: (convoyId: string) => closeConvoy(convoyId, "Closed from dashboard"),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["convoys"] });
+			setClosingConvoyId(null);
+		},
+		onError: () => {
+			setClosingConvoyId(null);
+		},
+	});
+
 	const handleConvoyClick = (convoyId: string) => {
 		navigate(`/convoys?selected=${convoyId}`);
+	};
+
+	const handleCloseConvoy = (convoyId: string) => {
+		setClosingConvoyId(convoyId);
+		closeMutation.mutate(convoyId);
 	};
 
 	return (
@@ -293,6 +336,8 @@ export function ConvoyPanel({ convoys, sseConnected }: ConvoyPanelProps) {
 							convoy={convoy}
 							eta={etas[i]}
 							onClick={() => handleConvoyClick(convoy.id)}
+							onClose={() => handleCloseConvoy(convoy.id)}
+							isClosing={closingConvoyId === convoy.id}
 						/>
 					))
 				)}
