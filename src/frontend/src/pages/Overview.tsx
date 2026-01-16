@@ -11,16 +11,17 @@ import {
 	Server,
 	Users,
 	Package,
-	Truck,
 	Radio,
 } from "lucide-react";
 import { getStatus, getConvoys, getBeads, startTown, shutdownTown } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
+import type { TownStatus, RigStatus, AgentRuntime, Bead } from "@/types/api";
 import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsSparklines";
 import { MayorDispatchModal } from "@/components/MayorDispatchModal";
 import { DeaconStatusPopup } from "@/components/dashboard/DeaconStatusPopup";
+import { ConvoyPanel } from "@/components/dashboard/ConvoyPanel";
+import { useConvoySubscription } from "@/hooks/useConvoySubscription";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -432,40 +433,6 @@ function WorkPipeline({ beads }: { beads: Bead[] }) {
 	);
 }
 
-// Convoy batch display
-function ConvoyBatch({ convoy }: { convoy: Convoy }) {
-	const completed = convoy.completed || 0;
-	const total = convoy.total || 1;
-	const progress = (completed / total) * 100;
-
-	return (
-		<div className="bg-slate-900/60 border border-slate-700 rounded p-2">
-			<div className="flex items-center justify-between mb-1">
-				<span className="text-xs font-mono text-slate-300 truncate max-w-[120px]" title={convoy.title}>
-					{convoy.id.slice(0, 8)}
-				</span>
-				<span className={cn("text-[10px] px-1.5 rounded uppercase font-bold",
-					convoy.status === "open" ? "bg-blue-900 text-blue-300" : "bg-green-900 text-green-300"
-				)}>
-					{convoy.status}
-				</span>
-			</div>
-			<div className="h-3 bg-black/50 rounded-sm overflow-hidden border border-slate-700">
-				<div
-					className={cn(
-						"h-full transition-all duration-500",
-						progress === 100 ? "bg-green-500" : "bg-blue-500"
-					)}
-					style={{ width: `${progress}%` }}
-				/>
-			</div>
-			<div className="text-[10px] text-slate-400 mt-1 text-right font-mono">
-				{completed}/{total}
-			</div>
-		</div>
-	);
-}
-
 // Alarm panel
 function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
 	const alerts: { level: "error" | "warning" | "info"; message: string }[] = [];
@@ -852,9 +819,12 @@ export default function Overview() {
 	const { data: convoys = [] } = useQuery({
 		queryKey: ["convoys", "open"],
 		queryFn: () => getConvoys("open"),
-		refetchInterval: 10_000,
+		refetchInterval: 30_000, // SSE handles real-time, this is fallback
 		retry: 1,
 	});
+
+	// Real-time convoy updates via SSE
+	const { connected: sseConnected } = useConvoySubscription({ enabled: true });
 
 	const { data: beads = [] } = useQuery({
 		queryKey: ["beads"],
@@ -1024,27 +994,8 @@ export default function Overview() {
 					<div className="col-span-3 flex flex-col gap-4">
 						<AlarmPanel agents={status.agents} rigs={status.rigs} />
 
-						{/* Convoy batch monitor */}
-						<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 flex-1 overflow-hidden flex flex-col">
-							<div className="flex items-center gap-2 mb-3">
-								<Truck size={16} className="text-purple-400" />
-								<span className="text-sm font-semibold text-slate-200">Active Convoys</span>
-								<span className="text-xs px-1.5 py-0.5 bg-purple-900 text-purple-300 rounded-full">
-									{convoys.length}
-								</span>
-							</div>
-							<div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
-								{convoys.length === 0 ? (
-									<div className="text-xs text-slate-500 text-center py-4">
-										No active convoys
-									</div>
-								) : (
-									convoys.map((convoy: Convoy) => (
-										<ConvoyBatch key={convoy.id} convoy={convoy} />
-									))
-								)}
-							</div>
-						</div>
+						{/* Convoy batch monitor - enhanced with real-time updates */}
+						<ConvoyPanel convoys={convoys} sseConnected={sseConnected} />
 					</div>
 
 					{/* Center panel - Main schematic */}
