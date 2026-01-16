@@ -12,13 +12,18 @@ import {
 	Timer,
 	Loader2,
 	Plus,
+	Search,
+	Check,
+	Trash2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import {
 	getConvoyDetail,
 	closeConvoy,
 	getSynthesisStatus,
 	startSynthesis,
+	getBeads,
+	addIssuesToConvoy,
+	removeIssueFromConvoy,
 } from "@/lib/api";
 import { cn, formatDate, calculateConvoyETA } from "@/lib/utils";
 import type { ConvoyDetail, TrackedIssueDetail } from "@/types/api";
@@ -77,7 +82,15 @@ function IssueStatusIcon({ status }: { status: string }) {
 }
 
 // Tracked issues table
-function TrackedIssuesTable({ issues }: { issues: TrackedIssueDetail[] }) {
+function TrackedIssuesTable({
+	issues,
+	onRemove,
+	isRemoving,
+}: {
+	issues: TrackedIssueDetail[];
+	onRemove?: (issueId: string) => void;
+	isRemoving?: boolean;
+}) {
 	if (!issues || issues.length === 0) {
 		return (
 			<div className="text-center py-6 text-slate-500">
@@ -95,14 +108,15 @@ function TrackedIssuesTable({ issues }: { issues: TrackedIssueDetail[] }) {
 						<th className="pb-2 pr-3 font-medium">Status</th>
 						<th className="pb-2 pr-3 font-medium">Issue</th>
 						<th className="pb-2 pr-3 font-medium">Title</th>
-						<th className="pb-2 font-medium">Worker</th>
+						<th className="pb-2 pr-3 font-medium">Worker</th>
+						{onRemove && <th className="pb-2 w-8 font-medium"></th>}
 					</tr>
 				</thead>
 				<tbody>
 					{issues.map((issue) => (
 						<tr
 							key={issue.id}
-							className="border-b border-slate-800/50 hover:bg-slate-800/30"
+							className="border-b border-slate-800/50 hover:bg-slate-800/30 group"
 						>
 							<td className="py-2 pr-3">
 								<IssueStatusIcon status={issue.status} />
@@ -115,7 +129,7 @@ function TrackedIssuesTable({ issues }: { issues: TrackedIssueDetail[] }) {
 							<td className="py-2 pr-3 max-w-[180px] truncate text-slate-300">
 								{issue.title}
 							</td>
-							<td className="py-2">
+							<td className="py-2 pr-3">
 								{issue.worker ? (
 									<span className="flex items-center gap-1.5">
 										<span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -132,6 +146,18 @@ function TrackedIssuesTable({ issues }: { issues: TrackedIssueDetail[] }) {
 									<span className="text-xs text-slate-600">-</span>
 								)}
 							</td>
+							{onRemove && (
+								<td className="py-2">
+									<button
+										onClick={() => onRemove(issue.id)}
+										disabled={isRemoving}
+										className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-all"
+										title="Remove from convoy"
+									>
+										<Trash2 size={14} />
+									</button>
+								</td>
+							)}
 						</tr>
 					))}
 				</tbody>
@@ -351,7 +377,9 @@ function SynthesisPanel({
 export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDetailModalProps) {
 	const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 	const [closeReason, setCloseReason] = useState("");
-	const navigate = useNavigate();
+	const [showAddIssues, setShowAddIssues] = useState(false);
+	const [addSearchQuery, setAddSearchQuery] = useState("");
+	const [issuesToAdd, setIssuesToAdd] = useState<string[]>([]);
 	const queryClient = useQueryClient();
 
 	const {
@@ -388,10 +416,31 @@ export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDeta
 		},
 	});
 
-	const handleExpandToFullPage = () => {
-		onClose();
-		navigate(`/convoys?selected=${convoyId}`);
-	};
+	// Fetch available issues for adding
+	const { data: availableIssues } = useQuery({
+		queryKey: ["beads", "open"],
+		queryFn: () => getBeads({ status: "open" }),
+		enabled: showAddIssues,
+	});
+
+	const addIssuesMutation = useMutation({
+		mutationFn: (issues: string[]) => addIssuesToConvoy(convoyId, issues),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["convoys"] });
+			queryClient.invalidateQueries({ queryKey: ["convoy-detail", convoyId] });
+			setShowAddIssues(false);
+			setIssuesToAdd([]);
+			setAddSearchQuery("");
+		},
+	});
+
+	const removeIssueMutation = useMutation({
+		mutationFn: (issueId: string) => removeIssueFromConvoy(convoyId, issueId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["convoys"] });
+			queryClient.invalidateQueries({ queryKey: ["convoy-detail", convoyId] });
+		},
+	});
 
 	const total = detail?.total ?? 0;
 	const completed = detail?.completed ?? 0;
@@ -400,6 +449,26 @@ export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDeta
 	// Determine if convoy can be closed (all issues complete for tracking convoy)
 	const needsSynthesis = !!(detail?.formula || detail?.molecule);
 	const canClose = detail?.status === "open" && total > 0 && completed === total && !needsSynthesis;
+
+	// Filter issues not already in convoy
+	const trackedIds = new Set(detail?.tracked_issues?.map((i) => i.id) || []);
+	const filteredAddIssues = availableIssues?.filter(
+		(issue) =>
+			issue.type !== "convoy" &&
+			issue.type !== "agent" &&
+			!trackedIds.has(issue.id) &&
+			(addSearchQuery === "" ||
+				issue.title.toLowerCase().includes(addSearchQuery.toLowerCase()) ||
+				issue.id.toLowerCase().includes(addSearchQuery.toLowerCase())),
+	);
+
+	const toggleAddIssue = (issueId: string) => {
+		setIssuesToAdd((prev) =>
+			prev.includes(issueId)
+				? prev.filter((id) => id !== issueId)
+				: [...prev, issueId],
+		);
+	};
 
 	return (
 		<div
@@ -429,8 +498,16 @@ export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDeta
 					<div className="flex items-center gap-2">
 						{detail?.status === "open" && (
 							<button
-								onClick={handleExpandToFullPage}
-								className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition-colors"
+								onClick={() => {
+									setShowAddIssues(!showAddIssues);
+									setShowCloseConfirm(false);
+								}}
+								className={cn(
+									"flex items-center gap-1 text-xs px-2 py-1 rounded font-medium transition-colors",
+									showAddIssues
+										? "bg-purple-600 text-white"
+										: "bg-slate-700 hover:bg-slate-600 text-slate-200"
+								)}
 							>
 								<Plus size={12} />
 								Add Issues
@@ -481,6 +558,127 @@ export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDeta
 								Cancel
 							</button>
 						</div>
+					</div>
+				)}
+
+				{/* Add Issues Panel */}
+				{showAddIssues && (
+					<div className="px-4 py-3 bg-purple-900/20 border-b border-purple-500/50">
+						<h3 className="font-medium text-purple-300 text-sm mb-2">
+							Add Issues to Convoy
+						</h3>
+
+						{/* Selected chips */}
+						{issuesToAdd.length > 0 && (
+							<div className="flex flex-wrap gap-1 mb-2">
+								{issuesToAdd.map((id) => (
+									<span
+										key={id}
+										className="inline-flex items-center gap-1 px-2 py-1 rounded bg-purple-500/20 text-purple-300 text-xs"
+									>
+										{id}
+										<button
+											onClick={() => toggleAddIssue(id)}
+											className="hover:text-white"
+										>
+											<X size={12} />
+										</button>
+									</span>
+								))}
+							</div>
+						)}
+
+						{/* Search */}
+						<div className="relative mb-2">
+							<Search
+								size={16}
+								className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+							/>
+							<input
+								type="text"
+								value={addSearchQuery}
+								onChange={(e) => setAddSearchQuery(e.target.value)}
+								placeholder="Search issues..."
+								className="w-full pl-9 pr-3 py-2 rounded bg-slate-900 border border-slate-700 focus:border-purple-500 focus:outline-none text-sm text-slate-200"
+							/>
+						</div>
+
+						{/* Issue list */}
+						<div className="max-h-32 overflow-auto border border-slate-700 rounded bg-slate-900 mb-2">
+							{filteredAddIssues && filteredAddIssues.length > 0 ? (
+								<div className="divide-y divide-slate-800">
+									{filteredAddIssues.slice(0, 15).map((issue) => (
+										<button
+											key={issue.id}
+											onClick={() => toggleAddIssue(issue.id)}
+											className={cn(
+												"w-full flex items-center gap-3 p-2 text-left hover:bg-slate-800 transition-colors",
+												issuesToAdd.includes(issue.id) && "bg-purple-900/20"
+											)}
+										>
+											<div
+												className={cn(
+													"w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+													issuesToAdd.includes(issue.id)
+														? "bg-purple-500 border-purple-500"
+														: "border-slate-600"
+												)}
+											>
+												{issuesToAdd.includes(issue.id) && (
+													<Check size={12} className="text-white" />
+												)}
+											</div>
+											<div className="min-w-0 flex-1">
+												<code className="text-xs text-slate-500">{issue.id}</code>
+												<p className="text-sm text-slate-300 truncate">{issue.title}</p>
+											</div>
+											<IssueStatusIcon status={issue.status} />
+										</button>
+									))}
+								</div>
+							) : (
+								<div className="p-3 text-center text-slate-500 text-sm">
+									No matching issues found
+								</div>
+							)}
+						</div>
+
+						{/* Actions */}
+						<div className="flex items-center gap-2">
+							<button
+								onClick={() => addIssuesMutation.mutate(issuesToAdd)}
+								disabled={issuesToAdd.length === 0 || addIssuesMutation.isPending}
+								className={cn(
+									"flex items-center gap-1 px-3 py-1.5 text-sm rounded transition-colors",
+									issuesToAdd.length === 0 || addIssuesMutation.isPending
+										? "bg-slate-700 text-slate-500 cursor-not-allowed"
+										: "bg-purple-600 text-white hover:bg-purple-500"
+								)}
+							>
+								{addIssuesMutation.isPending ? (
+									<Loader2 className="animate-spin" size={14} />
+								) : (
+									<Plus size={14} />
+								)}
+								Add {issuesToAdd.length > 0 ? `(${issuesToAdd.length})` : ""}
+							</button>
+							<button
+								onClick={() => {
+									setShowAddIssues(false);
+									setIssuesToAdd([]);
+									setAddSearchQuery("");
+								}}
+								className="px-3 py-1.5 text-sm rounded hover:bg-slate-800 transition-colors text-slate-300"
+							>
+								Cancel
+							</button>
+						</div>
+
+						{addIssuesMutation.isError && (
+							<p className="text-sm text-red-400 mt-2">
+								{addIssuesMutation.error?.message || "Failed to add issues"}
+							</p>
+						)}
 					</div>
 				)}
 
@@ -626,7 +824,15 @@ export function ConvoyDetailModal({ convoyId, onClose, initialData }: ConvoyDeta
 								<h3 className="text-sm font-medium mb-2 text-slate-200">
 									Tracked Issues
 								</h3>
-								<TrackedIssuesTable issues={detail.tracked_issues || []} />
+								<TrackedIssuesTable
+									issues={detail.tracked_issues || []}
+									onRemove={
+										detail.status === "open"
+											? (issueId) => removeIssueMutation.mutate(issueId)
+											: undefined
+									}
+									isRemoving={removeIssueMutation.isPending}
+								/>
 							</div>
 						</>
 					)}
