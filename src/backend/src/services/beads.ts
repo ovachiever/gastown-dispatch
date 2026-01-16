@@ -52,6 +52,9 @@ export async function createBead(
 		type?: string;
 		priority?: number;
 		parent?: string;
+		assignee?: string;
+		labels?: string[];
+		deps?: string[];
 	} = {},
 	townRoot?: string,
 ): Promise<ActionResult> {
@@ -68,6 +71,15 @@ export async function createBead(
 	}
 	if (options.parent) {
 		args.push(`--parent=${options.parent}`);
+	}
+	if (options.assignee) {
+		args.push(`--assignee=${options.assignee}`);
+	}
+	if (options.labels && options.labels.length > 0) {
+		args.push(`--labels=${options.labels.join(",")}`);
+	}
+	if (options.deps && options.deps.length > 0) {
+		args.push(`--deps=${options.deps.join(",")}`);
 	}
 
 	const result = await runBd([...args, "--json"], { cwd: townRoot });

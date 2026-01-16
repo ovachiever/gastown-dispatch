@@ -156,6 +156,9 @@ export async function createBead(data: {
 	type?: string;
 	priority?: number;
 	parent?: string;
+	assignee?: string;
+	labels?: string[];
+	deps?: string[];
 }): Promise<ActionResult> {
 	return fetchJson<ActionResult>("/beads", {
 		method: "POST",

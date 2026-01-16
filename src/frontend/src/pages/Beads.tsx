@@ -21,7 +21,6 @@ import {
   getBeads,
   getReadyBeads,
   getBead,
-  createBead,
   updateBeadStatus,
   closeBead,
 } from "@/lib/api";
@@ -32,6 +31,7 @@ import {
   getPriorityLabel,
   getPriorityColor,
 } from "@/lib/utils";
+import { CreateBeadModal } from "@/components/CreateBeadModal";
 import type { BeadFilters, Bead } from "@/types/api";
 
 export default function Beads() {
@@ -307,8 +307,8 @@ export default function Beads() {
       {showCreateModal && (
         <CreateBeadModal
           onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            setShowCreateModal(false);
+          onSuccess={(bead) => {
+            setSelectedBeadId(bead.id);
             refetch();
           }}
         />
@@ -602,135 +602,3 @@ function BeadDetail({
   );
 }
 
-function CreateBeadModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState<string>("task");
-  const [priority, setPriority] = useState<number>(2);
-
-  const createMutation = useMutation({
-    mutationFn: createBead,
-    onSuccess: () => {
-      onSuccess();
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({
-      title,
-      description: description || undefined,
-      type,
-      priority,
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gt-surface border border-gt-border rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gt-border">
-          <h2 className="text-xl font-semibold">Create New Bead</h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gt-border transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Title <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-3 py-2 bg-gt-background border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent"
-              placeholder="Enter bead title"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 bg-gt-background border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent resize-none"
-              placeholder="Enter bead description (optional)"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full px-3 py-2 bg-gt-background border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent"
-              >
-                <option value="bug">Bug</option>
-                <option value="feature">Feature</option>
-                <option value="task">Task</option>
-                <option value="epic">Epic</option>
-                <option value="chore">Chore</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(parseInt(e.target.value))}
-                className="w-full px-3 py-2 bg-gt-background border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent"
-              >
-                <option value="1">P1 - Critical</option>
-                <option value="2">P2 - High</option>
-                <option value="3">P3 - Normal</option>
-                <option value="4">P4 - Low</option>
-              </select>
-            </div>
-          </div>
-
-          {createMutation.error && (
-            <div className="bg-red-900/20 border border-red-500 rounded-lg p-3">
-              <p className="text-red-400 text-sm">
-                {createMutation.error.message}
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pt-4">
-            <button
-              type="submit"
-              disabled={!title || createMutation.isPending}
-              className="flex-1 px-4 py-2 rounded-lg bg-gt-accent text-black hover:bg-gt-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createMutation.isPending ? "Creating..." : "Create Bead"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-gt-surface hover:bg-gt-border transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}

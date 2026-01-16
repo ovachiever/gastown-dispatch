@@ -277,10 +277,10 @@ router.get(
 router.post(
 	"/beads",
 	asyncHandler(async (req, res) => {
-		const { title, description, type, priority, parent } = req.body;
+		const { title, description, type, priority, parent, assignee, labels, deps } = req.body;
 		const result = await createBead(
 			title,
-			{ description, type, priority, parent },
+			{ description, type, priority, parent, assignee, labels, deps },
 			getTownRoot(req),
 		);
 		res.status(result.success ? 201 : 400).json(result);
