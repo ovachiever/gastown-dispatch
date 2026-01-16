@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { TownStatus, RigStatus, AgentRuntime, Convoy, Bead } from "@/types/api";
 import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsSparklines";
+import { MayorDispatchModal } from "@/components/MayorDispatchModal";
 
 // Status indicator component
 function StatusIndicator({ status, size = "md", pulse = false }: {
@@ -658,7 +659,7 @@ function ControlHeader({ status, deaconRunning, onRefresh, onStart, onShutdown, 
 }
 
 // Industrial control room visualization
-function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
+function AgentFlow({ agents, rigs, onMayorClick }: { agents: AgentRuntime[]; rigs: RigStatus[]; onMayorClick?: () => void }) {
 	const mayor = agents.find(a => a.name === "mayor");
 	const deacon = agents.find(a => a.name === "deacon");
 
@@ -696,13 +697,18 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 
 			<div className="flex items-center justify-between gap-2">
 				{/* Mayor - Command Center */}
-				<div className="flex flex-col items-center flex-shrink-0">
+				<button
+					className="flex flex-col items-center flex-shrink-0 group"
+					onClick={onMayorClick}
+					title="Click to open Mayor dispatch"
+				>
 					<div className={cn(
-						"relative w-16 h-16 rounded-lg border-2 flex items-center justify-center overflow-hidden",
+						"relative w-16 h-16 rounded-lg border-2 flex items-center justify-center overflow-hidden transition-all",
 						getMayorStatus() === "active" ? "border-green-500 bg-gradient-to-b from-green-900/50 to-green-950/80" :
 						getMayorStatus() === "processing" ? "border-blue-500 bg-gradient-to-b from-blue-900/50 to-blue-950/80" :
 						getMayorStatus() === "idle" ? "border-yellow-500 bg-gradient-to-b from-yellow-900/50 to-yellow-950/80" :
-						"border-slate-600 bg-slate-800"
+						"border-slate-600 bg-slate-800",
+						"group-hover:ring-2 group-hover:ring-purple-500/50 group-hover:scale-105"
 					)}>
 						<div className="text-center">
 							<Radio size={18} className={cn(
@@ -723,7 +729,7 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 							{mayor.work_title}
 						</div>
 					)}
-				</div>
+				</button>
 
 				{/* Connection - Communication Link */}
 				<div className="flex-1 relative h-6 min-w-8">
@@ -811,6 +817,7 @@ function AgentFlow({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[]
 const TREND_BUFFER_SIZE = 60;
 
 export default function Overview() {
+	const [showMayorModal, setShowMayorModal] = useState(false);
 
 	const {
 		data: statusResponse,
@@ -1026,7 +1033,7 @@ export default function Overview() {
 					{/* Center panel - Main schematic */}
 					<div className="col-span-6 flex flex-col gap-4">
 						{/* Agent hierarchy */}
-						<AgentFlow agents={status.agents} rigs={status.rigs} />
+						<AgentFlow agents={status.agents} rigs={status.rigs} onMayorClick={() => setShowMayorModal(true)} />
 
 						{/* Work pipeline */}
 						<WorkPipeline beads={beads} />
@@ -1127,6 +1134,11 @@ export default function Overview() {
 					</div>
 				</div>
 			</div>
+
+			{/* Mayor Dispatch Modal */}
+			{showMayorModal && (
+				<MayorDispatchModal onClose={() => setShowMayorModal(false)} />
+			)}
 		</div>
 	);
 }
