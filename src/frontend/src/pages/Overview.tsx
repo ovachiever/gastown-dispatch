@@ -21,6 +21,7 @@ import { TrendsSparklines, type TrendData } from "@/components/dashboard/TrendsS
 import { MayorDispatchModal } from "@/components/MayorDispatchModal";
 import { DeaconStatusPopup } from "@/components/dashboard/DeaconStatusPopup";
 import { ConvoyPanel } from "@/components/dashboard/ConvoyPanel";
+import { AgentAnnunciator } from "@/components/dashboard/AgentAnnunciator";
 import { useConvoySubscription } from "@/hooks/useConvoySubscription";
 
 // Status indicator component
@@ -63,142 +64,6 @@ function DigitalCounter({ value, label, color = "text-green-400", digits = 3 }: 
 				{displayValue}
 			</div>
 			<div className="text-[10px] text-slate-400 uppercase tracking-wider">{label}</div>
-		</div>
-	);
-}
-
-// Queue level indicator (industrial silo style) - Note: MQ data not available from gt status
-function QueueLevel({ pending, inFlight, blocked, max = 20, label, isRigActive = false }: {
-	pending: number;
-	inFlight: number;
-	blocked: number;
-	max?: number;
-	label: string;
-	isRigActive?: boolean;
-}) {
-	const total = pending + inFlight + blocked;
-	const fillPercent = Math.min(100, (total / max) * 100);
-	const isActive = inFlight > 0;
-	const hasBlocked = blocked > 0;
-
-	return (
-		<div className={cn("flex flex-col items-center flex-shrink-0", !isRigActive && "opacity-50")}>
-			<div className={cn(
-				"text-[9px] sm:text-[10px] md:text-[11px] lg:text-xs uppercase mb-2 font-bold tracking-wide text-center max-w-[60px] sm:max-w-[70px] md:max-w-[80px] lg:max-w-[90px] truncate",
-				!isRigActive ? "text-slate-600" :
-				hasBlocked ? "text-red-400" :
-				isActive ? "text-blue-400" :
-				"text-slate-400"
-			)} title={label}>
-				{label}
-			</div>
-
-			{/* Silo container */}
-			<div className="relative">
-				{/* Top cone (hopper style) */}
-				<div className="w-14 sm:w-16 md:w-20 lg:w-20 h-3 sm:h-3.5 md:h-4 lg:h-4 relative">
-					<svg viewBox="0 0 80 16" className="w-full h-full">
-						<path d="M0,16 L40,0 L80,16 Z" fill={isRigActive ? "#1e293b" : "#0f172a"} stroke={isRigActive ? "#475569" : "#334155"} strokeWidth="1" />
-					</svg>
-				</div>
-
-				{/* Main silo body */}
-				<div className={cn(
-					"relative w-14 sm:w-16 md:w-20 lg:w-20 h-24 sm:h-28 md:h-32 lg:h-32 border-2 rounded-b-lg overflow-hidden",
-					!isRigActive ? "border-slate-700 bg-slate-900/30" :
-					hasBlocked ? "border-red-500 bg-red-950/30" :
-					isActive ? "border-blue-500 bg-blue-950/30" :
-					"border-slate-600 bg-slate-900/50"
-				)}>
-					{/* 3D effect - side shadow */}
-					<div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-r from-black/40 to-transparent" />
-					<div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-l from-black/40 to-transparent" />
-
-					{/* Fill level */}
-					<div
-						className="absolute bottom-0 left-0 right-0 transition-all duration-500"
-						style={{ height: `${fillPercent}%` }}
-					>
-						{/* Blocked (red) */}
-						{blocked > 0 && (
-							<div
-								className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-red-600 to-red-500"
-								style={{ height: `${(blocked / total) * 100}%` }}
-							/>
-						)}
-						{/* In-flight (blue - processing) */}
-						{inFlight > 0 && (
-							<div
-								className="absolute bg-gradient-to-t from-blue-600 to-blue-400"
-								style={{
-									bottom: `${(blocked / total) * 100}%`,
-									height: `${(inFlight / total) * 100}%`,
-									left: 0,
-									right: 0,
-								}}
-							>
-								{/* Animated bubbles for processing */}
-								<div className="absolute inset-0 overflow-hidden">
-									{[...Array(3)].map((_, i) => (
-										<div
-											key={i}
-											className="absolute w-1.5 h-1.5 bg-blue-300/50 rounded-full animate-bubble"
-											style={{
-												left: `${25 + i * 25}%`,
-												animationDelay: `${i * 0.4}s`,
-											}}
-										/>
-									))}
-								</div>
-							</div>
-						)}
-						{/* Pending (green - ready) */}
-						{pending > 0 && (
-							<div
-								className="absolute bg-gradient-to-t from-green-600 to-green-500"
-								style={{
-									bottom: `${((blocked + inFlight) / total) * 100}%`,
-									height: `${(pending / total) * 100}%`,
-									left: 0,
-									right: 0,
-								}}
-							/>
-						)}
-					</div>
-
-					{/* Level markers */}
-					{[25, 50, 75].map((level) => (
-						<div
-							key={level}
-							className="absolute left-0 right-0 border-t border-slate-500/30"
-							style={{ bottom: `${level}%` }}
-						>
-							<span className="absolute right-0.5 -top-1.5 text-[5px] sm:text-[6px] lg:text-[7px] text-slate-500 font-mono hidden sm:inline">{level}%</span>
-						</div>
-					))}
-
-					{/* Glass highlight */}
-					<div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
-				</div>
-
-				{/* Status light */}
-				<div className={cn(
-					"absolute -top-1 -right-1 w-2 h-2 rounded-full border border-slate-700",
-					hasBlocked ? "bg-red-500 animate-pulse" :
-					isActive ? "bg-blue-500 animate-pulse" :
-					total > 0 ? "bg-green-500" : "bg-slate-600"
-				)} />
-			</div>
-
-			{/* Stats readout */}
-			<div className="mt-2 text-center">
-				<div className="font-mono text-base sm:text-lg md:text-xl lg:text-xl font-bold text-slate-200">{total}</div>
-				<div className="flex gap-1.5 text-[8px] sm:text-[9px] md:text-[10px] lg:text-[10px] justify-center font-mono">
-					<span className="text-green-400">{pending}p</span>
-					<span className="text-blue-400">{inFlight}f</span>
-					<span className="text-red-400">{blocked}b</span>
-				</div>
-			</div>
 		</div>
 	);
 }
@@ -1006,32 +871,8 @@ export default function Overview() {
 						{/* Work pipeline */}
 						<WorkPipeline beads={beads} />
 
-						{/* Queue levels */}
-						<div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4 flex-1 overflow-hidden flex flex-col">
-							<div className="flex items-center gap-2 mb-4">
-								<Activity size={16} className="text-cyan-400" />
-								<span className="text-sm font-semibold text-slate-200">Message Queues</span>
-								<span className="text-xs text-slate-400">({status.rigs.length} rigs)</span>
-							</div>
-							<div className="overflow-y-auto flex-1 px-2">
-								{sortedRigs.length === 0 ? (
-									<div className="text-sm text-slate-500">No rigs configured</div>
-								) : (
-									<div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-6 gap-4 sm:gap-5 md:gap-6 lg:gap-8 justify-items-center py-2">
-										{sortedRigs.map((rig: RigStatus) => (
-											<QueueLevel
-												key={rig.name}
-												label={rig.name.slice(0, 12)}
-												pending={rig.mq?.pending || 0}
-												inFlight={rig.mq?.in_flight || 0}
-												blocked={rig.mq?.blocked || 0}
-												isRigActive={rig.polecat_count > 0 || rig.crew_count > 0}
-											/>
-										))}
-									</div>
-								)}
-							</div>
-						</div>
+						{/* Agent Status Annunciator */}
+						<AgentAnnunciator rigs={sortedRigs} />
 					</div>
 
 					{/* Right panel - Rig stations */}
