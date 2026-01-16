@@ -127,8 +127,36 @@ export async function listConvoys(
 	}
 	const convoys = await runGtJson<Convoy[]>(args, { cwd: townRoot });
 
+	// Fetch detailed status for each convoy in parallel to get tracking info
+	const enrichedConvoys = await Promise.all(
+		convoys.map(async (convoy) => {
+			try {
+				const detailed = await runGtJson<Convoy>(
+					["convoy", "status", convoy.id],
+					{ cwd: townRoot },
+				);
+				// gt convoy status returns array with single element
+				const statusData = Array.isArray(detailed) ? detailed[0] : detailed;
+				return {
+					...convoy,
+					...statusData,
+					// Map 'tracked' to 'tracked_issues' for frontend compatibility
+					tracked_issues: (statusData as any).tracked?.map((t: any) => ({
+						id: t.id,
+						title: t.title,
+						status: t.status,
+						assignee: t.assignee,
+					})),
+				};
+			} catch {
+				// If status fetch fails, return basic convoy
+				return convoy;
+			}
+		}),
+	);
+
 	// Enrich each convoy with synthesis-related fields from description
-	return convoys.map((convoy) => {
+	return enrichedConvoys.map((convoy) => {
 		const metadata = parseConvoyDescription(convoy.description);
 		const completed = convoy.completed ?? 0;
 		const total = convoy.total ?? 0;
@@ -138,7 +166,8 @@ export async function listConvoys(
 
 		// Determine if stranded (has open unassigned issues)
 		const isStranded = convoy.tracked_issues?.some(
-			(t) => t.status === "open" && !t.assignee,
+			(t: { status: string; assignee?: string }) =>
+				t.status === "open" && !t.assignee,
 		);
 
 		return {
