@@ -351,6 +351,15 @@ router.post(
 );
 
 router.post(
+	"/actions/reload",
+	asyncHandler(async (req, res) => {
+		const { reloadGt } = await import("../services/actions.js");
+		const result = await reloadGt(getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+router.post(
 	"/actions/sling",
 	asyncHandler(async (req, res) => {
 		const request = req.body as SlingRequest;

@@ -296,3 +296,53 @@ export async function nukePolecat(
 		message: `Nuked polecat: ${polecatName} from ${rigName}`,
 	};
 }
+
+/**
+ * Reload gt after source code update.
+ * This restarts only the long-running gt processes:
+ * - gt status-line (auto-respawns via tmux)
+ * - gt daemon (if running)
+ *
+ * SAFE: Does NOT touch Mayor/Deacon tmux sessions or any other infrastructure.
+ * Those sessions invoke gt commands which will automatically use the new binary.
+ */
+export async function reloadGt(townRoot?: string): Promise<ActionResult> {
+	const results: string[] = [];
+
+	// 1. Kill gt status-line processes (they auto-respawn via tmux refresh)
+	try {
+		const { runCommand } = await import("../commands/runner.js");
+		await runCommand("pkill", ["-f", "gt status-line"], { timeout: 5_000 });
+		results.push("Killed gt status-line (will auto-respawn)");
+	} catch {
+		// pkill returns non-zero if no processes matched - that's fine
+		results.push("No gt status-line processes found");
+	}
+
+	// 2. Check if daemon is running and restart it
+	const daemonStatus = await runGt(["daemon", "status"], { cwd: townRoot, timeout: 5_000 });
+	const daemonWasRunning = daemonStatus.stdout.includes("running");
+
+	if (daemonWasRunning) {
+		// Stop daemon
+		await runGt(["daemon", "stop"], { cwd: townRoot, timeout: 10_000 });
+		// Brief pause
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		// Start daemon
+		const startResult = await runGt(["daemon", "start"], { cwd: townRoot, timeout: 10_000 });
+		if (startResult.exitCode === 0) {
+			results.push("Restarted gt daemon");
+		} else {
+			results.push(`Failed to restart daemon: ${startResult.stderr}`);
+		}
+	} else {
+		results.push("gt daemon was not running (no restart needed)");
+	}
+
+	invalidateStatusCache();
+	return {
+		success: true,
+		message: "gt reloaded successfully",
+		data: { details: results },
+	};
+}
