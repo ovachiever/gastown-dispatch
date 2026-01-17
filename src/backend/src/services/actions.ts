@@ -26,7 +26,7 @@ export async function startTown(townRoot?: string): Promise<ActionResult> {
 }
 
 export async function shutdownTown(townRoot?: string): Promise<ActionResult> {
-	const result = await runGt(["shutdown"], { cwd: townRoot, timeout: 60_000 });
+	const result = await runGt(["shutdown", "--yes"], { cwd: townRoot, timeout: 60_000 });
 
 	if (result.exitCode !== 0) {
 		return {
