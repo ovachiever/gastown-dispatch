@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
 	RefreshCw,
 	Play,
@@ -704,6 +705,7 @@ function AgentFlow({ agents, rigs, onMayorClick }: { agents: AgentRuntime[]; rig
 const TREND_BUFFER_SIZE = 60;
 
 export default function Overview() {
+	const navigate = useNavigate();
 	const [showMayorModal, setShowMayorModal] = useState(false);
 
 	const {
@@ -894,7 +896,7 @@ export default function Overview() {
 			<div className="flex-1 p-4 overflow-hidden">
 				<div className="h-full grid grid-cols-12 gap-4">
 					{/* Left panel - Alarms and Convoys */}
-					<div className="col-span-3 flex flex-col gap-4">
+					<div className="col-span-3 flex flex-col gap-4 overflow-hidden">
 						<AlarmPanel agents={status.agents} rigs={status.rigs} />
 
 						{/* Convoy batch monitor - enhanced with real-time updates */}
@@ -902,7 +904,7 @@ export default function Overview() {
 					</div>
 
 					{/* Center panel - Main schematic */}
-					<div className="col-span-6 flex flex-col gap-4">
+					<div className="col-span-6 flex flex-col gap-4 overflow-hidden">
 						{/* Agent hierarchy */}
 						<AgentFlow agents={status.agents} rigs={status.rigs} onMayorClick={() => setShowMayorModal(true)} />
 
@@ -910,7 +912,7 @@ export default function Overview() {
 						<WorkPipeline beads={beads} />
 
 						{/* Agent Status Annunciator */}
-						<AgentAnnunciator rigs={status.rigs} />
+						<AgentAnnunciator rigs={status.rigs} onAgentClick={(agent, rig) => navigate(`/agents?rig=${rig}&agent=${agent.name}`)} />
 					</div>
 
 					{/* Right panel - Rig stations */}
