@@ -298,21 +298,27 @@ function WorkPipeline({ beads }: { beads: Bead[] }) {
 	);
 }
 
-// Alarm panel
+// Alarm panel with "Needs Attention" category
 function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[] }) {
-	const alerts: { level: "error" | "warning" | "info"; message: string }[] = [];
+	interface Alert {
+		level: "error" | "warning" | "attention" | "info";
+		message: string;
+		rig?: string;
+		agent?: string;
+	}
+	const alerts: Alert[] = [];
 
-	// Check for agent errors
+	// Check for agent errors (top-level agents like mayor, deacon)
 	agents.forEach(a => {
 		if (a.state === "error") {
-			alerts.push({ level: "error", message: `${a.name}: Agent in error state` });
+			alerts.push({ level: "error", message: `${a.name}: Agent in error state`, agent: a.name });
 		}
 		if (a.unread_mail > 5) {
-			alerts.push({ level: "warning", message: `${a.name}: ${a.unread_mail} unread messages` });
+			alerts.push({ level: "warning", message: `${a.name}: ${a.unread_mail} unread messages`, agent: a.name });
 		}
 	});
 
-	// Check for rig-level issues
+	// Check for rig-level issues and agent attention items
 	rigs.forEach(r => {
 		const rigAgents = r.agents || [];
 		const runningAgents = rigAgents.filter(a => a.running).length;
@@ -320,18 +326,43 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 
 		// Alert if rig has allocated workers but none are running
 		if ((r.polecat_count > 0 || r.crew_count > 0) && runningAgents === 0 && totalAgents > 0) {
-			alerts.push({ level: "warning", message: `${r.name}: Workers allocated but none running` });
+			alerts.push({ level: "warning", message: `${r.name}: Workers allocated but none running`, rig: r.name });
 		}
+
+		// Check each agent in the rig for attention-worthy conditions
+		rigAgents.forEach(agent => {
+			// Stuck agent: has work but not running
+			if (agent.has_work && !agent.running) {
+				const workDesc = agent.work_title ? `: ${agent.work_title}` : "";
+				alerts.push({
+					level: "attention",
+					message: `${agent.name} stuck on${workDesc}`,
+					rig: r.name,
+					agent: agent.name,
+				});
+			}
+
+			// High mail backlog (> 3 unread)
+			if (agent.unread_mail > 3) {
+				alerts.push({
+					level: "attention",
+					message: `${r.name}/${agent.name} has ${agent.unread_mail} unread messages`,
+					rig: r.name,
+					agent: agent.name,
+				});
+			}
+		});
 	});
 
 	const errorCount = alerts.filter(a => a.level === "error").length;
 	const warningCount = alerts.filter(a => a.level === "warning").length;
+	const attentionCount = alerts.filter(a => a.level === "attention").length;
 
 	return (
 		<div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">
-					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400" : "text-slate-400"} />
+					<AlertTriangle size={16} className={errorCount > 0 ? "text-red-400" : attentionCount > 0 ? "text-cyan-400" : "text-slate-400"} />
 					<span className="text-sm font-semibold text-slate-200">Alarms</span>
 				</div>
 				<div className="flex items-center gap-2">
@@ -343,6 +374,11 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 					{warningCount > 0 && (
 						<span className="text-xs px-2 py-0.5 bg-yellow-900 text-yellow-300 rounded-full font-mono">
 							{warningCount} WARN
+						</span>
+					)}
+					{attentionCount > 0 && (
+						<span className="text-xs px-2 py-0.5 bg-cyan-900 text-cyan-300 rounded-full font-mono">
+							{attentionCount} ATTN
 						</span>
 					)}
 					{alerts.length === 0 && (
@@ -359,18 +395,20 @@ function AlarmPanel({ agents, rigs }: { agents: AgentRuntime[]; rigs: RigStatus[
 						No active alarms
 					</div>
 				) : (
-					alerts.slice(0, 5).map((alert, i) => (
+					alerts.slice(0, 8).map((alert, i) => (
 						<div
 							key={i}
 							className={cn(
 								"text-xs px-2 py-1 rounded flex items-center gap-2",
 								alert.level === "error" ? "bg-red-900/30 text-red-300" :
 								alert.level === "warning" ? "bg-yellow-900/30 text-yellow-300" :
+								alert.level === "attention" ? "bg-cyan-900/30 text-cyan-300" :
 								"bg-blue-900/30 text-blue-300"
 							)}
 						>
 							{alert.level === "error" ? <AlertCircle size={12} /> :
 							 alert.level === "warning" ? <AlertTriangle size={12} /> :
+							 alert.level === "attention" ? <Zap size={12} /> :
 							 <CheckCircle2 size={12} />}
 							<span className="truncate">{alert.message}</span>
 						</div>
