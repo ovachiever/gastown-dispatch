@@ -188,3 +188,121 @@ export async function getAllRigBeads(
 
 	return results;
 }
+
+// =====================
+// Dependencies
+// =====================
+
+export interface BeadDependency {
+	id: string;
+	title: string;
+	status: string;
+	type: string;
+	priority: number;
+}
+
+export async function getBeadDependencies(
+	beadId: string,
+	townRoot?: string,
+): Promise<{ blocks: BeadDependency[]; blocked_by: BeadDependency[] }> {
+	// Get dependencies (issues this bead depends on)
+	const blocked_by = await runBdJson<BeadDependency[]>(
+		["dep", "list", beadId, "--depends-on"],
+		{ cwd: townRoot },
+	);
+
+	// Get issues this bead blocks
+	const blocks = await runBdJson<BeadDependency[]>(
+		["dep", "list", beadId, "--blocks"],
+		{ cwd: townRoot },
+	);
+
+	return { blocks, blocked_by };
+}
+
+export async function addBeadDependency(
+	beadId: string,
+	dependsOn: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runBd(["dep", "add", beadId, dependsOn], {
+		cwd: townRoot,
+	});
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to add dependency",
+			error: result.stderr,
+		};
+	}
+
+	return {
+		success: true,
+		message: `Added dependency: ${beadId} depends on ${dependsOn}`,
+	};
+}
+
+export async function removeBeadDependency(
+	beadId: string,
+	dependsOn: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runBd(["dep", "remove", beadId, dependsOn], {
+		cwd: townRoot,
+	});
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to remove dependency",
+			error: result.stderr,
+		};
+	}
+
+	return {
+		success: true,
+		message: `Removed dependency: ${beadId} no longer depends on ${dependsOn}`,
+	};
+}
+
+// =====================
+// Comments
+// =====================
+
+export interface BeadComment {
+	id: string;
+	author: string;
+	body: string;
+	created_at: string;
+}
+
+export async function getBeadComments(
+	beadId: string,
+	townRoot?: string,
+): Promise<BeadComment[]> {
+	return runBdJson<BeadComment[]>(["comments", beadId], { cwd: townRoot });
+}
+
+export async function addBeadComment(
+	beadId: string,
+	comment: string,
+	townRoot?: string,
+): Promise<ActionResult> {
+	const result = await runBd(["comments", "add", beadId, comment], {
+		cwd: townRoot,
+	});
+
+	if (result.exitCode !== 0) {
+		return {
+			success: false,
+			message: "Failed to add comment",
+			error: result.stderr,
+		};
+	}
+
+	return {
+		success: true,
+		message: "Comment added",
+	};
+}

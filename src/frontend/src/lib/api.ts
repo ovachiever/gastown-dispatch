@@ -7,6 +7,8 @@ import type {
 	Bead,
 	ActionResult,
 	BeadFilters,
+	BeadDependencies,
+	BeadComment,
 	MergeQueueListResponse,
 	NextMergeRequest,
 	MailMessage,
@@ -181,6 +183,56 @@ export async function closeBead(
 		method: "POST",
 		body: JSON.stringify({ reason }),
 	});
+}
+
+// Bead Dependencies
+export async function getBeadDependencies(
+	id: string,
+): Promise<BeadDependencies> {
+	return fetchJson<BeadDependencies>(
+		`/beads/${encodeURIComponent(id)}/dependencies`,
+	);
+}
+
+export async function addBeadDependency(
+	id: string,
+	dependsOn: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/beads/${encodeURIComponent(id)}/dependencies`,
+		{
+			method: "POST",
+			body: JSON.stringify({ depends_on: dependsOn }),
+		},
+	);
+}
+
+export async function removeBeadDependency(
+	id: string,
+	dependsOn: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/beads/${encodeURIComponent(id)}/dependencies/${encodeURIComponent(dependsOn)}`,
+		{ method: "DELETE" },
+	);
+}
+
+// Bead Comments
+export async function getBeadComments(id: string): Promise<BeadComment[]> {
+	return fetchJson<BeadComment[]>(`/beads/${encodeURIComponent(id)}/comments`);
+}
+
+export async function addBeadComment(
+	id: string,
+	comment: string,
+): Promise<ActionResult> {
+	return fetchJson<ActionResult>(
+		`/beads/${encodeURIComponent(id)}/comments`,
+		{
+			method: "POST",
+			body: JSON.stringify({ comment }),
+		},
+	);
 }
 
 // Actions

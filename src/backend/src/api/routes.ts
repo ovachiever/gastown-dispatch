@@ -24,6 +24,11 @@ import {
 	closeBead,
 	listRigBeads,
 	getAllRigBeads,
+	getBeadDependencies,
+	addBeadDependency,
+	removeBeadDependency,
+	getBeadComments,
+	addBeadComment,
 } from "../services/beads.js";
 import {
 	startTown,
@@ -305,6 +310,62 @@ router.post(
 	asyncHandler(async (req, res) => {
 		const { reason } = req.body;
 		const result = await closeBead(req.params.id, reason, getTownRoot(req));
+		res.json(result);
+	}),
+);
+
+// Dependencies
+router.get(
+	"/beads/:id/dependencies",
+	asyncHandler(async (req, res) => {
+		const deps = await getBeadDependencies(req.params.id, getTownRoot(req));
+		res.json(deps);
+	}),
+);
+
+router.post(
+	"/beads/:id/dependencies",
+	asyncHandler(async (req, res) => {
+		const { depends_on } = req.body as { depends_on: string };
+		const result = await addBeadDependency(
+			req.params.id,
+			depends_on,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+router.delete(
+	"/beads/:id/dependencies/:dependsOn",
+	asyncHandler(async (req, res) => {
+		const result = await removeBeadDependency(
+			req.params.id,
+			req.params.dependsOn,
+			getTownRoot(req),
+		);
+		res.json(result);
+	}),
+);
+
+// Comments
+router.get(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const comments = await getBeadComments(req.params.id, getTownRoot(req));
+		res.json(comments);
+	}),
+);
+
+router.post(
+	"/beads/:id/comments",
+	asyncHandler(async (req, res) => {
+		const { comment } = req.body as { comment: string };
+		const result = await addBeadComment(
+			req.params.id,
+			comment,
+			getTownRoot(req),
+		);
 		res.json(result);
 	}),
 );

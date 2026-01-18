@@ -25,6 +25,11 @@ import {
   createBead,
   updateBeadStatus,
   closeBead,
+  getBeadDependencies,
+  addBeadDependency,
+  removeBeadDependency,
+  getBeadComments,
+  addBeadComment,
 } from "@/lib/api";
 import {
   cn,
@@ -33,7 +38,7 @@ import {
   getPriorityLabel,
   getPriorityColor,
 } from "@/lib/utils";
-import type { BeadFilters, Bead } from "@/types/api";
+import type { BeadFilters, Bead, BeadDependency, BeadComment } from "@/types/api";
 
 export default function Beads() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -343,6 +348,31 @@ function BeadDetail({
   onRefresh: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [newComment, setNewComment] = useState("");
+  const [showAddDependency, setShowAddDependency] = useState(false);
+  const [newDependency, setNewDependency] = useState("");
+
+  // Fetch dependencies
+  const {
+    data: dependencies,
+    isLoading: isLoadingDeps,
+    refetch: refetchDeps,
+  } = useQuery({
+    queryKey: ["bead-dependencies", bead?.id],
+    queryFn: () => getBeadDependencies(bead!.id),
+    enabled: !!bead?.id,
+  });
+
+  // Fetch comments
+  const {
+    data: comments,
+    isLoading: isLoadingComments,
+    refetch: refetchComments,
+  } = useQuery({
+    queryKey: ["bead-comments", bead?.id],
+    queryFn: () => getBeadComments(bead!.id),
+    enabled: !!bead?.id,
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -359,6 +389,33 @@ function BeadDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beads"] });
       onRefresh();
+    },
+  });
+
+  const addDependencyMutation = useMutation({
+    mutationFn: ({ id, dependsOn }: { id: string; dependsOn: string }) =>
+      addBeadDependency(id, dependsOn),
+    onSuccess: () => {
+      refetchDeps();
+      setNewDependency("");
+      setShowAddDependency(false);
+    },
+  });
+
+  const removeDependencyMutation = useMutation({
+    mutationFn: ({ id, dependsOn }: { id: string; dependsOn: string }) =>
+      removeBeadDependency(id, dependsOn),
+    onSuccess: () => {
+      refetchDeps();
+    },
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: ({ id, comment }: { id: string; comment: string }) =>
+      addBeadComment(id, comment),
+    onSuccess: () => {
+      refetchComments();
+      setNewComment("");
     },
   });
 
@@ -585,28 +642,189 @@ function BeadDetail({
 
         {/* Dependencies */}
         <div>
-          <h3 className="text-sm font-semibold text-gt-muted uppercase mb-2 flex items-center gap-2">
-            <GitBranch size={14} />
-            Dependencies
-          </h3>
-          <div className="bg-gt-surface border border-gt-border rounded-lg p-4">
-            <p className="text-sm text-gt-muted">
-              No dependencies configured
-            </p>
-            <button className="mt-2 text-sm text-gt-accent hover:underline">
-              Add dependency
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gt-muted uppercase flex items-center gap-2">
+              <GitBranch size={14} />
+              Dependencies
+            </h3>
+            <button
+              onClick={() => setShowAddDependency(!showAddDependency)}
+              className="text-xs text-gt-accent hover:underline"
+            >
+              {showAddDependency ? "Cancel" : "+ Add"}
             </button>
+          </div>
+
+          {showAddDependency && (
+            <div className="mb-3 flex gap-2">
+              <input
+                type="text"
+                value={newDependency}
+                onChange={(e) => setNewDependency(e.target.value)}
+                placeholder="Enter bead ID (e.g., gtdispat-123)"
+                className="flex-1 px-3 py-2 text-sm bg-gt-background border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent"
+              />
+              <button
+                onClick={() => {
+                  if (bead && newDependency) {
+                    addDependencyMutation.mutate({
+                      id: bead.id,
+                      dependsOn: newDependency,
+                    });
+                  }
+                }}
+                disabled={!newDependency || addDependencyMutation.isPending}
+                className="px-3 py-2 text-sm rounded-lg bg-gt-accent text-black hover:bg-gt-accent/90 transition-colors disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {/* Blocked by (dependencies) */}
+            <div className="bg-gt-surface border border-gt-border rounded-lg p-4">
+              <h4 className="text-xs font-semibold text-gt-muted uppercase mb-2">
+                Blocked by ({dependencies?.blocked_by?.length || 0})
+              </h4>
+              {isLoadingDeps ? (
+                <p className="text-sm text-gt-muted">Loading...</p>
+              ) : dependencies?.blocked_by && dependencies.blocked_by.length > 0 ? (
+                <div className="space-y-2">
+                  {dependencies.blocked_by.map((dep) => (
+                    <div
+                      key={dep.id}
+                      className="flex items-center justify-between p-2 bg-gt-background rounded-lg"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-gt-muted">
+                            {dep.id}
+                          </span>
+                          <span className={cn("text-xs capitalize", getStatusColor(dep.status))}>
+                            {dep.status}
+                          </span>
+                        </div>
+                        <p className="text-sm truncate">{dep.title}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (bead) {
+                            removeDependencyMutation.mutate({
+                              id: bead.id,
+                              dependsOn: dep.id,
+                            });
+                          }
+                        }}
+                        disabled={removeDependencyMutation.isPending}
+                        className="ml-2 p-1 rounded hover:bg-red-500/20 text-red-400 transition-colors"
+                        title="Remove dependency"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gt-muted">
+                  No blocking dependencies
+                </p>
+              )}
+            </div>
+
+            {/* Blocks (dependents) */}
+            <div className="bg-gt-surface border border-gt-border rounded-lg p-4">
+              <h4 className="text-xs font-semibold text-gt-muted uppercase mb-2">
+                Blocks ({dependencies?.blocks?.length || 0})
+              </h4>
+              {isLoadingDeps ? (
+                <p className="text-sm text-gt-muted">Loading...</p>
+              ) : dependencies?.blocks && dependencies.blocks.length > 0 ? (
+                <div className="space-y-2">
+                  {dependencies.blocks.map((dep) => (
+                    <div
+                      key={dep.id}
+                      className="p-2 bg-gt-background rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-gt-muted">
+                          {dep.id}
+                        </span>
+                        <span className={cn("text-xs capitalize", getStatusColor(dep.status))}>
+                          {dep.status}
+                        </span>
+                      </div>
+                      <p className="text-sm truncate">{dep.title}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gt-muted">
+                  Not blocking any issues
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Activity */}
+        {/* Comments */}
         <div>
           <h3 className="text-sm font-semibold text-gt-muted uppercase mb-2 flex items-center gap-2">
             <MessageSquare size={14} />
-            Activity
+            Comments ({comments?.length || 0})
           </h3>
-          <div className="bg-gt-surface border border-gt-border rounded-lg p-4">
-            <p className="text-sm text-gt-muted">No activity yet</p>
+
+          {/* Add comment form */}
+          <div className="mb-3">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              rows={3}
+              className="w-full px-3 py-2 text-sm bg-gt-surface border border-gt-border rounded-lg focus:outline-none focus:ring-2 focus:ring-gt-accent resize-none"
+            />
+            <button
+              onClick={() => {
+                if (bead && newComment.trim()) {
+                  addCommentMutation.mutate({
+                    id: bead.id,
+                    comment: newComment,
+                  });
+                }
+              }}
+              disabled={!newComment.trim() || addCommentMutation.isPending}
+              className="mt-2 px-3 py-1.5 text-sm rounded-lg bg-gt-accent text-black hover:bg-gt-accent/90 transition-colors disabled:opacity-50"
+            >
+              {addCommentMutation.isPending ? "Adding..." : "Add Comment"}
+            </button>
+          </div>
+
+          {/* Comments list */}
+          <div className="bg-gt-surface border border-gt-border rounded-lg divide-y divide-gt-border">
+            {isLoadingComments ? (
+              <div className="p-4">
+                <p className="text-sm text-gt-muted">Loading comments...</p>
+              </div>
+            ) : comments && comments.length > 0 ? (
+              comments.map((comment) => (
+                <div key={comment.id} className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-gt-muted" />
+                      <span className="text-sm font-medium">{comment.author}</span>
+                    </div>
+                    <span className="text-xs text-gt-muted">
+                      {formatRelativeTime(comment.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
+                </div>
+              ))
+            ) : (
+              <div className="p-4">
+                <p className="text-sm text-gt-muted">No comments yet</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -248,6 +248,27 @@ export interface MailInboxFilters {
 	type?: MailType;
 }
 
+// Bead Dependencies and Comments
+export interface BeadDependency {
+	id: string;
+	title: string;
+	status: string;
+	type: string;
+	priority: number;
+}
+
+export interface BeadDependencies {
+	blocks: BeadDependency[];
+	blocked_by: BeadDependency[];
+}
+
+export interface BeadComment {
+	id: string;
+	author: string;
+	body: string;
+	created_at: string;
+}
+
 // Patrol (Deacon) types
 export interface DeaconHeartbeat {
 	timestamp: string;
